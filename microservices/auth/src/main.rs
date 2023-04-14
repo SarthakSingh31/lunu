@@ -3,7 +3,7 @@ use std::{cell::RefCell, env, ops::DerefMut, str::FromStr};
 use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use lunu::{
     auth::{
-        auth_server::AuthServer, Account, AccountEmail, EmailLoginIntent, EmailLoginParams,
+        auth_server::AuthServer, Account, AccountEmail, EmailLoginIntent, EmailLoginParams, Empty,
         NewPassLoginIntent, NewPassLoginParams, OptionalAccount, PasswordParams, SessionToken,
     },
     diesel::{
@@ -207,21 +207,13 @@ impl lunu::auth::auth_server::Auth for Auth {
 
         use schema::email_login_intents::dsl as eli_dsl;
 
-        let now = OffsetDateTime::now_utc();
-
-        delete(eli_dsl::email_login_intents)
-            .filter(eli_dsl::expires_at.gt(now))
-            .execute(&mut conn)
-            .await
-            .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
-
         let pass_key: String = RNG.with(|rng| {
             let mut rng = rng.borrow_mut();
             (0..Self::SESSION_INTENT_CODE_LEN)
                 .map(|_| rng.sample(Alphanumeric) as char)
                 .collect()
         });
-        let expires_at = now.saturating_add(Self::SESSION_INTENT_DURATION);
+        let expires_at = OffsetDateTime::now_utc().saturating_add(Self::SESSION_INTENT_DURATION);
         let id = Uuid::new_v4();
         insert_into(eli_dsl::email_login_intents)
             .values(models::EmailLoginIntent {
@@ -303,16 +295,7 @@ impl lunu::auth::auth_server::Auth for Auth {
 
         use schema::new_pass_login_intents::dsl as fpli_dsl;
 
-        let now = OffsetDateTime::now_utc();
-
-        // TODO: Remove these deletes from here and extract that into a delete all expired function
-        delete(fpli_dsl::new_pass_login_intents)
-            .filter(fpli_dsl::expires_at.gt(now))
-            .execute(conn)
-            .await
-            .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
-
-        let expires_at = now.saturating_add(Self::SESSION_INTENT_DURATION);
+        let expires_at = OffsetDateTime::now_utc().saturating_add(Self::SESSION_INTENT_DURATION);
         let id: String = RNG.with(|rng| {
             let mut rng = rng.borrow_mut();
             (0..Self::NEW_PASS_LOGIN_TOKEN_LEN)
@@ -392,6 +375,12 @@ impl lunu::auth::auth_server::Auth for Auth {
                     salt: salt.as_str(),
                     created_at: now,
                 })
+                .execute(conn)
+                .await
+                .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
+
+            delete(fpli_dsl::new_pass_login_intents)
+                .filter(fpli_dsl::id.eq(&token))
                 .execute(conn)
                 .await
                 .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
@@ -488,6 +477,41 @@ impl lunu::auth::auth_server::Auth for Auth {
         } else {
             Err(AuthError::WrongPassword.into())
         }
+    }
+
+    async fn cleanup_db(
+        &self,
+        _request: tonic::Request<Empty>,
+    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AuthError::PoolConnectionFailed)?;
+        let now = OffsetDateTime::now_utc();
+
+        use schema::new_pass_login_intents::dsl as fpli_dsl;
+        delete(fpli_dsl::new_pass_login_intents)
+            .filter(fpli_dsl::expires_at.lt(now))
+            .execute(conn)
+            .await
+            .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
+
+        use schema::email_login_intents::dsl as eli_dsl;
+        delete(eli_dsl::email_login_intents)
+            .filter(eli_dsl::expires_at.lt(now))
+            .execute(conn)
+            .await
+            .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
+
+        use schema::sessions::dsl as s_dsl;
+        delete(s_dsl::sessions)
+            .filter(s_dsl::expires_at.lt(now))
+            .execute(conn)
+            .await
+            .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(Empty {}))
     }
 }
 

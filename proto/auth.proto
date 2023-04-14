@@ -40,6 +40,8 @@ message PasswordParams {
   string password = 2;
 }
 
+message Empty {}
+
 service Auth {
   rpc FetchAccount(SessionToken) returns (OptionalAccount) {}
   rpc CreateEmailLoginIntent(AccountEmail) returns (EmailLoginIntent) {}
@@ -48,4 +50,5 @@ service Auth {
   rpc LoginWithNewPassLogin(NewPassLoginParams) returns (SessionToken) {}
   rpc CreateWithPassword(PasswordParams) returns (SessionToken) {}
   rpc LoginWithPassword(PasswordParams) returns (SessionToken) {}
+  rpc CleanupDB(Empty) returns (Empty) {}
 }

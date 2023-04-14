@@ -1,6 +1,8 @@
 mod auth;
 mod storage;
 
+use std::time::Duration;
+
 pub use auth::User;
 
 use actix_web::{http, web, App, HttpServer};
@@ -14,7 +16,24 @@ register_tonic_clients! {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    tracing_subscriber::fmt().init();
+
     init_clients().await;
+
+    tokio::spawn(async {
+        let mut client = AUTH_CLIENT
+            .get()
+            .expect("AUTH_CLIENT used before it was initalized")
+            .clone();
+
+        loop {
+            // Sleep for one day
+            tokio::time::sleep(Duration::from_secs(86400)).await;
+            if let Err(err) = client.cleanup_db(lunu::auth::Empty {}).await {
+                tracing::error!("Error in cleaing up the auth db: {err}");
+            }
+        }
+    });
 
     HttpServer::new(move || {
         App::new()
