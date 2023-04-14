@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package auth;
+
+enum Scope {
+  PUBLIC = 0;
+  CUSTOMER = 1;
+  MERCHANT = 2;
+  PARTNER = 3;
+  ADMIN = 4;
+};
+
+message Account {
+  string id = 1;
+  repeated Scope scopes = 2;
+}
+
+message OptionalAccount { optional Account account = 1; }
+
+message SessionToken { string token = 1; }
+
+message AccountEmail { string email = 1; }
+
+message EmailLoginIntent { string token = 1; }
+
+message NewPassLoginIntent { string token = 1; }
+
+message EmailLoginParams {
+  string token = 1;
+  string code = 2;
+}
+
+message NewPassLoginParams {
+  string token = 1;
+  string password = 2;
+}
+
+message PasswordParams {
+  string email = 1;
+  string password = 2;
+}
+
+service Auth {
+  rpc FetchAccount(SessionToken) returns (OptionalAccount) {}
+  rpc CreateEmailLoginIntent(AccountEmail) returns (EmailLoginIntent) {}
+  rpc LoginWithEmailLogin(EmailLoginParams) returns (SessionToken) {}
+  rpc CreateNewPassLoginIntent(AccountEmail) returns (NewPassLoginIntent) {}
+  rpc LoginWithNewPassLogin(NewPassLoginParams) returns (SessionToken) {}
+  rpc CreateWithPassword(PasswordParams) returns (SessionToken) {}
+  rpc LoginWithPassword(PasswordParams) returns (SessionToken) {}
+}

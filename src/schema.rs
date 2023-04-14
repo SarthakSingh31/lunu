@@ -4,45 +4,88 @@ pub mod sql_types {
     #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "kyc_level"))]
     pub struct KycLevel;
+
+    #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "scope"))]
+    pub struct Scope;
+}
+
+diesel::table! {
+    accounts (id) {
+        id -> Uuid,
+        email -> Text,
+        created_at -> Timestamptz,
+        blocked -> Bool,
+    }
 }
 
 diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::KycLevel;
 
-    accounts (id) {
-        id -> Uuid,
-        created_at -> Timestamptz,
-        approved_at -> Nullable<Timestamptz>,
-        approved -> Bool,
-        blocked -> Bool,
-        kyc_level -> KycLevel,
-        addr_line_1 -> Text,
-        addr_line_2 -> Text,
-        country -> Text,
-    }
-}
-
-diesel::table! {
     customers (id) {
         id -> Uuid,
         first_name -> Text,
         last_name -> Text,
-        email -> Text,
-        total_risk -> Float4,
-        personal_limit -> Nullable<Money>,
-        personal_kyc_limit -> Nullable<Money>,
+        kyc_level -> KycLevel,
         account_id -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
+    email_login_intents (id) {
+        id -> Uuid,
+        account_id -> Uuid,
+        pass_key -> Text,
+        expires_at -> Timestamptz,
     }
 }
 
 diesel::table! {
     merchants (id) {
         id -> Uuid,
-        first_name -> Text,
-        last_name -> Text,
-        email -> Text,
+        addr_line_1 -> Text,
+        addr_line_2 -> Text,
+        country -> Text,
+        approved_at -> Nullable<Timestamptz>,
+        approved -> Bool,
         account_id -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
+    new_pass_login_intents (id) {
+        id -> Text,
+        account_id -> Uuid,
+        expires_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    password_login (account_id) {
+        account_id -> Uuid,
+        hash -> Text,
+        salt -> Text,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::Scope;
+
+    scopes (account_id, scope) {
+        account_id -> Uuid,
+        scope -> Scope,
+    }
+}
+
+diesel::table! {
+    sessions (token) {
+        token -> Text,
+        account_id -> Uuid,
+        password_login -> Bool,
+        expires_at -> Timestamptz,
     }
 }
 
@@ -73,12 +116,22 @@ diesel::table! {
 }
 
 diesel::joinable!(customers -> accounts (account_id));
+diesel::joinable!(email_login_intents -> accounts (account_id));
 diesel::joinable!(merchants -> accounts (account_id));
+diesel::joinable!(new_pass_login_intents -> accounts (account_id));
+diesel::joinable!(password_login -> accounts (account_id));
+diesel::joinable!(scopes -> accounts (account_id));
+diesel::joinable!(sessions -> accounts (account_id));
 diesel::joinable!(transactions -> merchants (merchant_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     customers,
+    email_login_intents,
     merchants,
+    new_pass_login_intents,
+    password_login,
+    scopes,
+    sessions,
     transactions,
 );

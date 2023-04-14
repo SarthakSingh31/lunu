@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package storage;
+
+message FileId {
+  string account_id = 1;
+  string name = 2;
+}
+
+message File {
+  FileId id = 1;
+  bytes data = 2;
+}
+
+message FileData { optional bytes data = 1; }
+
+message Exists { bool exisits = 1; }
+
+service Storage {
+  rpc Put(File) returns (FileData) {}
+  rpc Get(FileId) returns (FileData) {}
+  rpc HasFile(FileId) returns (Exists) {}
+  rpc Delete(FileId) returns (FileData) {}
+}

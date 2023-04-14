@@ -1,5 +1,11 @@
-DROP TABLE transactions;
-DROP TABLE merchants;
-DROP TABLE customers;
-DROP TABLE accounts;
-DROP TYPE KYC_LEVEL;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS merchants;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS scopes;
+DROP TABLE IF EXISTS email_login_intents;
+DROP TABLE IF EXISTS new_pass_login_intents;
+DROP TABLE IF EXISTS password_login;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;
+DROP TYPE IF EXISTS SCOPE;
+DROP TYPE IF EXISTS KYC_LEVEL;

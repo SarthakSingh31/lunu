@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package account;
+
+message AccountDesc { string email = 1; }
+
+message CustomerDesc { string account_id = 1; }
+
+message MerchantDesc { string account_id = 1; }
+
+message AccountId { string id = 1; }
+
+message CustomerId { string id = 1; }
+
+message MerchantId { string id = 1; }
+
+service Account {
+  rpc CreateAccount(AccountDesc) returns (AccountId) {}
+  rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
+  rpc CreateMerchant(MerchantDesc) returns (MerchantId) {}
+}
