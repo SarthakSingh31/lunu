@@ -378,6 +378,13 @@ impl lunu::auth::auth_server::Auth for Auth {
 
             use schema::password_login::dsl as pl_dsl;
 
+            // Delete an old password if it exists
+            delete(pl_dsl::password_login)
+                .filter(pl_dsl::account_id.eq(account_id))
+                .execute(conn)
+                .await
+                .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
+
             insert_into(pl_dsl::password_login)
                 .values(models::PasswordLogin {
                     account_id,
