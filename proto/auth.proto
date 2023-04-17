@@ -23,8 +23,6 @@ message AccountEmail { string email = 1; }
 
 message EmailLoginIntent { string token = 1; }
 
-message NewPassLoginIntent { string token = 1; }
-
 message EmailLoginParams {
   string token = 1;
   string code = 2;
@@ -46,7 +44,7 @@ service Auth {
   rpc FetchAccount(SessionToken) returns (OptionalAccount) {}
   rpc CreateEmailLoginIntent(AccountEmail) returns (EmailLoginIntent) {}
   rpc LoginWithEmailLogin(EmailLoginParams) returns (SessionToken) {}
-  rpc CreateNewPassLoginIntent(AccountEmail) returns (NewPassLoginIntent) {}
+  rpc CreateNewPassLoginIntent(AccountEmail) returns (Empty) {}
   rpc LoginWithNewPassLogin(NewPassLoginParams) returns (SessionToken) {}
   rpc CreateWithPassword(PasswordParams) returns (SessionToken) {}
   rpc LoginWithPassword(PasswordParams) returns (SessionToken) {}

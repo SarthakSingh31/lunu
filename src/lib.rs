@@ -16,6 +16,7 @@ pub enum Microservice {
     Auth,
     Account,
     Storage,
+    Email,
 }
 
 lazy_static::lazy_static! {
@@ -23,6 +24,7 @@ lazy_static::lazy_static! {
         (Microservice::Auth, "[::1]:50051"),
         (Microservice::Account, "[::1]:50052"),
         (Microservice::Storage, "[::1]:50053"),
+        (Microservice::Email, "[::1]:50054"),
     ].into_iter().collect();
 }
 
@@ -70,4 +72,9 @@ pub mod account {
 #[cfg(feature = "storage")]
 pub mod storage {
     tonic::include_proto!("storage");
+}
+
+#[cfg(feature = "email")]
+pub mod email {
+    tonic::include_proto!("email");
 }

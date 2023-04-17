@@ -8,4 +8,7 @@ fn main() {
     tonic_build::configure()
         .compile(&["proto/storage.proto"], &["proto"])
         .unwrap();
+    tonic_build::configure()
+        .compile(&["proto/email.proto"], &["proto"])
+        .unwrap();
 }

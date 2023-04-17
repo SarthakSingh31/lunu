@@ -113,12 +113,12 @@ impl ResponseError for AuthError {
 }
 
 #[derive(serde::Deserialize)]
-pub struct EmailLoginIntent {
+pub(super) struct EmailLoginIntent {
     email: String,
 }
 
 #[actix_web::post("/create_email_login_intent")]
-pub async fn create_email_login_intent(intent: Json<EmailLoginIntent>) -> impl Responder {
+pub(super) async fn create_email_login_intent(intent: Json<EmailLoginIntent>) -> impl Responder {
     let mut client = AUTH_CLIENT
         .get()
         .expect("AUTH_CLIENT used before it was initalized")
@@ -145,13 +145,13 @@ pub async fn create_email_login_intent(intent: Json<EmailLoginIntent>) -> impl R
 }
 
 #[derive(serde::Deserialize)]
-pub struct EmailLoginParams {
+pub(super) struct EmailLoginParams {
     token: String,
     code: String,
 }
 
 #[actix_web::post("/login_to_email_login_intent")]
-pub async fn login_to_email_login_intent(params: Json<EmailLoginParams>) -> impl Responder {
+pub(super) async fn login_to_email_login_intent(params: Json<EmailLoginParams>) -> impl Responder {
     let mut client = AUTH_CLIENT
         .get()
         .expect("AUTH_CLIENT used before it was initalized")
@@ -178,12 +178,128 @@ pub async fn login_to_email_login_intent(params: Json<EmailLoginParams>) -> impl
 }
 
 #[derive(serde::Deserialize)]
-pub struct PasswordParams {
-    username: String,
+pub(super) struct CreateNewPassLoginParams {
+    email: String,
+}
+
+#[actix_web::post("/create_new_pass_login_intent")]
+pub(super) async fn create_new_pass_login_intent(
+    params: Json<CreateNewPassLoginParams>,
+) -> impl Responder {
+    let mut client = AUTH_CLIENT
+        .get()
+        .expect("AUTH_CLIENT used before it was initalized")
+        .clone();
+
+    let CreateNewPassLoginParams { email } = params.0;
+    match client
+        .create_new_pass_login_intent(lunu::auth::AccountEmail { email })
+        .await
+    {
+        Ok(_resp) => (
+            Json(serde_json::json!({
+                "success": "The new passoword link was sent in the email",
+            })),
+            http::StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct NewPassLoginParams {
+    token: String,
     password: String,
 }
 
+#[actix_web::post("/login_with_new_pass_login")]
+pub(super) async fn login_with_new_pass_login(params: Json<NewPassLoginParams>) -> impl Responder {
+    let mut client = AUTH_CLIENT
+        .get()
+        .expect("AUTH_CLIENT used before it was initalized")
+        .clone();
+
+    let NewPassLoginParams { token, password } = params.0;
+    match client
+        .login_with_new_pass_login(lunu::auth::NewPassLoginParams { token, password })
+        .await
+    {
+        Ok(resp) => (
+            Json(serde_json::json!({
+                "token": resp.into_inner().token,
+            })),
+            http::StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct PasswordParams {
+    email: String,
+    password: String,
+}
+
+#[actix_web::post("/create_with_password")]
+pub(super) async fn create_with_password(params: Json<PasswordParams>) -> impl Responder {
+    let mut client = AUTH_CLIENT
+        .get()
+        .expect("AUTH_CLIENT used before it was initalized")
+        .clone();
+
+    let PasswordParams { email, password } = params.0;
+    match client
+        .create_with_password(lunu::auth::PasswordParams { email, password })
+        .await
+    {
+        Ok(resp) => (
+            Json(serde_json::json!({
+                "token": resp.into_inner().token,
+            })),
+            http::StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
 #[actix_web::post("/login_with_password")]
-pub async fn login_with_password(params: Json<PasswordParams>) -> impl Responder {
-    Json(serde_json::json!({}))
+pub(super) async fn login_with_password(params: Json<PasswordParams>) -> impl Responder {
+    let mut client = AUTH_CLIENT
+        .get()
+        .expect("AUTH_CLIENT used before it was initalized")
+        .clone();
+
+    let PasswordParams { email, password } = params.0;
+    match client
+        .login_with_password(lunu::auth::PasswordParams { email, password })
+        .await
+    {
+        Ok(resp) => (
+            Json(serde_json::json!({
+                "token": resp.into_inner().token,
+            })),
+            http::StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
 }

@@ -40,7 +40,11 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/api/v1/auth")
                     .service(auth::create_email_login_intent)
-                    .service(auth::login_to_email_login_intent),
+                    .service(auth::login_to_email_login_intent)
+                    .service(auth::create_new_pass_login_intent)
+                    .service(auth::login_with_new_pass_login)
+                    .service(auth::create_with_password)
+                    .service(auth::login_with_password),
             )
             .service(
                 web::scope("/api/v1/storage")

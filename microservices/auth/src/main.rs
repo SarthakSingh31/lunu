@@ -4,7 +4,7 @@ use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use lunu::{
     auth::{
         auth_server::AuthServer, Account, AccountEmail, EmailLoginIntent, EmailLoginParams, Empty,
-        NewPassLoginIntent, NewPassLoginParams, OptionalAccount, PasswordParams, SessionToken,
+        NewPassLoginParams, OptionalAccount, PasswordParams, SessionToken,
     },
     diesel::{
         delete, insert_into, pg::Pg, ExpressionMethods, JoinOnDsl, OptionalExtension, QueryDsl,
@@ -14,7 +14,8 @@ use lunu::{
         AsyncConnection, AsyncPgConnection, RunQueryDsl,
     },
     dotenvy::dotenv,
-    models, schema, Microservice, MICROSERVICE_ADDRS,
+    email::Email,
+    models, register_tonic_clients, schema, Microservice, MICROSERVICE_ADDRS,
 };
 use rand::{
     distributions::Alphanumeric,
@@ -22,11 +23,15 @@ use rand::{
     thread_rng, Rng,
 };
 use time::{Duration, OffsetDateTime};
-use tonic::transport::Server;
+use tonic::transport::{Channel, Server};
 use uuid::Uuid;
 
 thread_local! {
     static RNG: RefCell<ThreadRng> = RefCell::new(thread_rng());
+}
+
+register_tonic_clients! {
+    (MAIL_CLIENT, lunu::email::mail_client::MailClient<Channel>, lunu::Microservice::Email, "email"),
 }
 
 struct Auth {
@@ -226,6 +231,18 @@ impl lunu::auth::auth_server::Auth for Auth {
             .await
             .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
 
+        let mut client = MAIL_CLIENT
+            .get()
+            .expect("MAIL_CLIENT used before it was initalized")
+            .clone();
+        client
+            .send(Email {
+                email,
+                subject: "Pass key for lunu login".into(),
+                body_html: format!("<h1>{pass_key}</h1>"),
+            })
+            .await?;
+
         Ok(tonic::Response::new(EmailLoginIntent {
             token: id.to_string(),
         }))
@@ -283,7 +300,7 @@ impl lunu::auth::auth_server::Auth for Auth {
     async fn create_new_pass_login_intent(
         &self,
         request: tonic::Request<AccountEmail>,
-    ) -> Result<tonic::Response<NewPassLoginIntent>, tonic::Status> {
+    ) -> Result<tonic::Response<Empty>, tonic::Status> {
         let AccountEmail { email } = request.into_inner();
         let conn = &mut self
             .pool
@@ -312,9 +329,19 @@ impl lunu::auth::auth_server::Auth for Auth {
             .await
             .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(NewPassLoginIntent {
-            token: id.to_string(),
-        }))
+        let mut client = MAIL_CLIENT
+            .get()
+            .expect("MAIL_CLIENT used before it was initalized")
+            .clone();
+        client
+            .send(Email {
+                email,
+                subject: "Login url token for lunu login".into(),
+                body_html: format!("<h1>{id}</h1>"),
+            })
+            .await?;
+
+        Ok(tonic::Response::new(Empty {}))
     }
 
     async fn login_with_new_pass_login(
@@ -570,6 +597,8 @@ impl From<AuthError> for tonic::Status {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
+
+    init_clients().await;
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 

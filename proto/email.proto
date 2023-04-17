@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package email;
+
+message Email {
+  string email = 1;
+  string subject = 2;
+  string body_html = 3;
+}
+
+message Empty {}
+
+service Mail {
+  rpc Send(Email) returns (Empty) {}
+}
