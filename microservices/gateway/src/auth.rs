@@ -11,6 +11,7 @@ pub enum User {
     Authenticated {
         account_id: String,
         scopes: HashSet<Scope>,
+        password_login: bool,
     },
     UnAuthenticated,
 }
@@ -70,13 +71,13 @@ impl FromRequest for User {
                     .fetch_account(SessionToken { token: session })
                     .await
                     .map_err(|err| AuthError::FailedToFetchUser(err))?
-                    .into_inner()
-                    .account;
+                    .into_inner();
 
-                if let Some(account) = account {
+                if let Some(acc) = account.account {
                     Ok(User::Authenticated {
-                        scopes: account.scopes().collect(),
-                        account_id: account.id,
+                        scopes: acc.scopes().collect(),
+                        account_id: acc.id,
+                        password_login: account.password_login,
                     })
                 } else {
                     Ok(User::UnAuthenticated)

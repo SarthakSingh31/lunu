@@ -15,7 +15,10 @@ message Account {
   repeated Scope scopes = 2;
 }
 
-message OptionalAccount { optional Account account = 1; }
+message OptionalAccount {
+  optional Account account = 1;
+  bool password_login = 2;
+}
 
 message SessionToken { string token = 1; }
 

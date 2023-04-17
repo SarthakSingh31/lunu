@@ -18,7 +18,7 @@ use crate::{tonic_code_to_status_code, User, STORAGE_CLIENT};
 pub async fn get_file(user: User, path: web::Path<(String, String)>) -> impl Responder {
     let (in_account_id, name) = path.into_inner();
 
-    let User::Authenticated { account_id, scopes } = user else {
+    let User::Authenticated { account_id, scopes, ..  } = user else {
         return Either::Right((
             Json(serde_json::json!({
                 "error": "You are not authenticated and can't view files."
@@ -101,7 +101,7 @@ pub async fn put_file(
 ) -> impl Responder {
     let (in_account_id, name) = path.into_inner();
 
-    let User::Authenticated { account_id, scopes } = user else {
+    let User::Authenticated { account_id, scopes , .. } = user else {
         return Either::Right((
             Json(serde_json::json!({
                 "error": "You are not authenticated and can't write files."
@@ -173,7 +173,7 @@ pub async fn put_file(
 pub async fn delete_file(user: User, path: web::Path<(String, String)>) -> impl Responder {
     let (in_account_id, name) = path.into_inner();
 
-    let User::Authenticated { account_id, scopes } = user else {
+    let User::Authenticated { account_id, scopes, .. } = user else {
         return (
             Json(serde_json::json!({
                 "error": "You are not authenticated and can't delete files."

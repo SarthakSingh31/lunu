@@ -157,10 +157,14 @@ impl lunu::auth::auth_server::Auth for Auth {
         use schema::scopes;
         use schema::sessions;
 
-        let (id, time) = sessions::dsl::sessions
-            .select((sessions::dsl::account_id, sessions::dsl::expires_at))
+        let (id, password_login, time) = sessions::dsl::sessions
+            .select((
+                sessions::dsl::account_id,
+                sessions::dsl::password_login,
+                sessions::dsl::expires_at,
+            ))
             .filter(sessions::dsl::token.eq(&request.get_ref().token))
-            .first::<(Uuid, OffsetDateTime)>(conn)
+            .first::<(Uuid, bool, OffsetDateTime)>(conn)
             .await
             .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
 
@@ -173,7 +177,10 @@ impl lunu::auth::auth_server::Auth for Auth {
                 .await
                 .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
 
-            Ok(tonic::Response::new(OptionalAccount { account: None }))
+            Ok(tonic::Response::new(OptionalAccount {
+                account: None,
+                password_login: false,
+            }))
         } else {
             let scopes = sessions::dsl::sessions
                 .inner_join(
@@ -193,6 +200,7 @@ impl lunu::auth::auth_server::Auth for Auth {
                     id: id.to_string(),
                     scopes,
                 }),
+                password_login,
             }))
         }
     }
