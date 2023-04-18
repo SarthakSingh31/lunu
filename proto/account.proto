@@ -2,20 +2,34 @@ syntax = "proto3";
 
 package account;
 
-message AccountDesc { string email = 1; }
+enum Approval {
+  OnHold = 0;
+  Approved = 1;
+  Rejected = 2;
+}
 
-message CustomerDesc { string account_id = 1; }
+message CustomerDesc {
+  string account_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+}
 
-message MerchantDesc { string account_id = 1; }
-
-message AccountId { string id = 1; }
+message RetailerDesc { string account_id = 1; }
 
 message CustomerId { string id = 1; }
 
-message MerchantId { string id = 1; }
+message RetailerId { string id = 1; }
+
+message UpdateApproval {
+  string id = 1;
+  Approval approval = 2;
+}
+
+message Empty {}
 
 service Account {
-  rpc CreateAccount(AccountDesc) returns (AccountId) {}
   rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
-  rpc CreateMerchant(MerchantDesc) returns (MerchantId) {}
+  rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
+  rpc UpdateApprovalCustomer(UpdateApproval) returns (Empty) {}
+  rpc UpdateApprovalRetailer(UpdateApproval) returns (Empty) {}
 }

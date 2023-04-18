@@ -3,9 +3,15 @@ CREATE TYPE KYC_LEVEL AS ENUM ('Level0', 'Level1', 'Level2', 'Level3');
 CREATE TYPE SCOPE AS ENUM (
     'Public',
     'Customer',
-    'Merchant',
+    'Retailer',
     'Partner',
     'Admin'
+);
+
+CREATE TYPE APPROVAL AS ENUM (
+    'Approved',
+    'Rejected',
+    'OnHold'
 );
 
 -- Authentication
@@ -70,15 +76,15 @@ CREATE TABLE sessions(
 );
 
 -- Customer Data
-CREATE TABLE merchants(
+CREATE TABLE retailers(
     id UUID PRIMARY KEY,
 
-    addr_line_1 TEXT NOT NULL,
-    addr_line_2 TEXT NOT NULL,
-    country TEXT NOT NULL,
+    addr_line_1 TEXT,
+    addr_line_2 TEXT,
+    country TEXT,
 
     approved_at TIMESTAMP WITH TIME ZONE,
-    approved BOOLEAN NOT NULL DEFAULT false,
+    approved APPROVAL NOT NULL DEFAULT 'OnHold',
 
     account_id UUID UNIQUE,
     FOREIGN KEY (account_id)
@@ -92,8 +98,14 @@ CREATE TABLE customers(
 
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
-    
+
     kyc_level KYC_LEVEL NOT NULL DEFAULT 'Level0',
+
+    approved_at TIMESTAMP WITH TIME ZONE,
+    approved APPROVAL NOT NULL DEFAULT 'OnHold',
+
+    residence_address TEXT,
+    country_of_residence TEXT,
 
     account_id UUID UNIQUE,
     FOREIGN KEY (account_id)
@@ -105,7 +117,7 @@ CREATE TABLE customers(
 CREATE TABLE transactions(
     id UUID PRIMARY KEY,
 
-    merchant_id UUID,
+    retailer_id UUID,
     retailer_transaction_id TEXT,
     retailer_customer_id TEXT,
 
@@ -127,8 +139,8 @@ CREATE TABLE transactions(
     exchange_spread_fee MONEY NOT NULL,
     partner_fee MONEY NOT NULL,
     status INTEGER NOT NULL,
-    FOREIGN KEY (merchant_id)
-        REFERENCES merchants (id)
+    FOREIGN KEY (retailer_id)
+        REFERENCES retailers (id)
             ON UPDATE CASCADE
             ON DELETE SET NULL,
     FOREIGN KEY (source_account_wallet)

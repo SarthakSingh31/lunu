@@ -67,6 +67,17 @@ pub mod auth {
 #[cfg(feature = "account")]
 pub mod account {
     tonic::include_proto!("account");
+
+    #[cfg(feature = "db")]
+    impl From<Approval> for super::models::Approval {
+        fn from(val: Approval) -> super::models::Approval {
+            match val {
+                Approval::Approved => super::models::Approval::Approved,
+                Approval::Rejected => super::models::Approval::Rejected,
+                Approval::OnHold => super::models::Approval::OnHold,
+            }
+        }
+    }
 }
 
 #[cfg(feature = "storage")]

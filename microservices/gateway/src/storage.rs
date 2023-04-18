@@ -27,7 +27,7 @@ pub async fn get_file(user: User, path: web::Path<(String, String)>) -> impl Res
         ));
     };
 
-    if !scopes.contains(&Scope::Admin) && account_id == in_account_id {
+    if !scopes.contains(&Scope::Admin) && account_id != in_account_id {
         return Either::Right((
             Json(serde_json::json!({
                 "error": "You do not have permission to view this file."
@@ -110,7 +110,7 @@ pub async fn put_file(
         ));
     };
 
-    if !scopes.contains(&Scope::Admin) && account_id == in_account_id {
+    if !scopes.contains(&Scope::Admin) && account_id != in_account_id {
         return Either::Right((
             Json(serde_json::json!({
                 "error": "You do not have permission to write this file."
@@ -182,7 +182,7 @@ pub async fn delete_file(user: User, path: web::Path<(String, String)>) -> impl 
         );
     };
 
-    if !scopes.contains(&Scope::Admin) && account_id == in_account_id {
+    if !scopes.contains(&Scope::Admin) && account_id != in_account_id {
         return (
             Json(serde_json::json!({
                 "error": "You do not have permission to delete this file."

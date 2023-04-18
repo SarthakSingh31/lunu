@@ -1,3 +1,4 @@
+mod account;
 mod auth;
 mod storage;
 
@@ -12,6 +13,7 @@ use tonic::transport::Channel;
 register_tonic_clients! {
     (AUTH_CLIENT, lunu::auth::auth_client::AuthClient<Channel>, lunu::Microservice::Auth, "auth"),
     (STORAGE_CLIENT, lunu::storage::storage_client::StorageClient<Channel>, lunu::Microservice::Storage, "storage"),
+    (ACCOUNT_CLIENT, lunu::account::account_client::AccountClient<Channel>, lunu::Microservice::Account, "account"),
 }
 
 #[actix_web::main]
@@ -51,6 +53,13 @@ async fn main() -> std::io::Result<()> {
                     .service(storage::get_file)
                     .service(storage::put_file)
                     .service(storage::delete_file),
+            )
+            .service(
+                web::scope("/api/v1/account")
+                    .service(account::create_customer)
+                    .service(account::create_retailer)
+                    .service(account::update_approval_customer)
+                    .service(account::update_approval_retailer),
             )
     })
     .bind(("127.0.0.1", 8080))?

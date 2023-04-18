@@ -48,7 +48,7 @@ impl deserialize::FromSql<crate::schema::sql_types::KycLevel, Pg> for KycLevel {
 pub enum ScopeKind {
     Public = 0,
     Customer = 1,
-    Merchant = 2,
+    Retailer = 2,
     Partner = 3,
     Admin = 4,
 }
@@ -58,7 +58,7 @@ impl serialize::ToSql<crate::schema::sql_types::Scope, Pg> for ScopeKind {
         match *self {
             ScopeKind::Public => out.write_all(b"Public")?,
             ScopeKind::Customer => out.write_all(b"Customer")?,
-            ScopeKind::Merchant => out.write_all(b"Merchant")?,
+            ScopeKind::Retailer => out.write_all(b"Retailer")?,
             ScopeKind::Partner => out.write_all(b"Partner")?,
             ScopeKind::Admin => out.write_all(b"Admin")?,
         }
@@ -71,9 +71,39 @@ impl deserialize::FromSql<crate::schema::sql_types::Scope, Pg> for ScopeKind {
         match bytes.as_bytes() {
             b"Public" => Ok(ScopeKind::Public),
             b"Customer" => Ok(ScopeKind::Customer),
-            b"Merchant" => Ok(ScopeKind::Merchant),
+            b"Retailer" => Ok(ScopeKind::Retailer),
             b"Partner" => Ok(ScopeKind::Partner),
             b"Admin" => Ok(ScopeKind::Admin),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
+#[derive(Debug, AsExpression, FromSqlRow, serde::Deserialize)]
+#[diesel(sql_type = crate::schema::sql_types::Approval)]
+pub enum Approval {
+    OnHold = 0,
+    Approved = 1,
+    Rejected = 2,
+}
+
+impl serialize::ToSql<crate::schema::sql_types::Approval, Pg> for Approval {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Pg>) -> serialize::Result {
+        match *self {
+            Approval::OnHold => out.write_all(b"OnHold")?,
+            Approval::Approved => out.write_all(b"Approved")?,
+            Approval::Rejected => out.write_all(b"Rejected")?,
+        }
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl deserialize::FromSql<crate::schema::sql_types::Approval, Pg> for Approval {
+    fn from_sql(bytes: PgValue) -> deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"OnHold" => Ok(Approval::OnHold),
+            b"Approved" => Ok(Approval::Approved),
+            b"Rejected" => Ok(Approval::Rejected),
             _ => Err("Unrecognized enum variant".into()),
         }
     }
@@ -125,4 +155,20 @@ pub struct Session<'s> {
     pub account_id: Uuid,
     pub password_login: bool,
     pub expires_at: OffsetDateTime,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = schema::customers)]
+pub struct Customer {
+    pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub account_id: Uuid,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = schema::retailers)]
+pub struct Retailer {
+    pub id: Uuid,
+    pub account_id: Uuid,
 }
