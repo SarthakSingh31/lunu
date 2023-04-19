@@ -31,7 +31,7 @@ async fn main() -> std::io::Result<()> {
         loop {
             // Sleep for one day
             tokio::time::sleep(Duration::from_secs(86400)).await;
-            if let Err(err) = client.cleanup_db(lunu::auth::Empty {}).await {
+            if let Err(err) = client.cleanup_db(()).await {
                 tracing::error!("Error in cleaing up the auth db: {err}");
             }
         }

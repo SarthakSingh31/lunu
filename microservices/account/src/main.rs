@@ -2,7 +2,7 @@ use std::{env, str::FromStr};
 
 use lunu::{
     account::{
-        account_server::AccountServer, CustomerDesc, CustomerId, Empty, RetailerDesc, RetailerId,
+        account_server::AccountServer, CustomerDesc, CustomerId, RetailerDesc, RetailerId,
         UpdateApproval,
     },
     diesel::{insert_into, update, ExpressionMethods},
@@ -87,7 +87,7 @@ impl lunu::account::account_server::Account for Account {
     async fn update_approval_customer(
         &self,
         request: tonic::Request<UpdateApproval>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
@@ -115,13 +115,13 @@ impl lunu::account::account_server::Account for Account {
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(Empty {}))
+        Ok(tonic::Response::new(()))
     }
 
     async fn update_approval_retailer(
         &self,
         request: tonic::Request<UpdateApproval>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
@@ -149,7 +149,7 @@ impl lunu::account::account_server::Account for Account {
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(Empty {}))
+        Ok(tonic::Response::new(()))
     }
 }
 

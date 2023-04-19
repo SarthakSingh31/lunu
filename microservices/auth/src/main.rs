@@ -3,7 +3,7 @@ use std::{cell::RefCell, env, ops::DerefMut, str::FromStr};
 use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use lunu::{
     auth::{
-        auth_server::AuthServer, Account, AccountEmail, EmailLoginIntent, EmailLoginParams, Empty,
+        auth_server::AuthServer, Account, AccountEmail, EmailLoginIntent, EmailLoginParams,
         NewPassLoginParams, OptionalAccount, PasswordParams, SessionToken,
     },
     diesel::{
@@ -308,7 +308,7 @@ impl lunu::auth::auth_server::Auth for Auth {
     async fn create_new_pass_login_intent(
         &self,
         request: tonic::Request<AccountEmail>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let AccountEmail { email } = request.into_inner();
         let conn = &mut self
             .pool
@@ -349,7 +349,7 @@ impl lunu::auth::auth_server::Auth for Auth {
             })
             .await?;
 
-        Ok(tonic::Response::new(Empty {}))
+        Ok(tonic::Response::new(()))
     }
 
     async fn login_with_new_pass_login(
@@ -516,8 +516,8 @@ impl lunu::auth::auth_server::Auth for Auth {
 
     async fn cleanup_db(
         &self,
-        _request: tonic::Request<Empty>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+        _request: tonic::Request<()>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
@@ -546,7 +546,7 @@ impl lunu::auth::auth_server::Auth for Auth {
             .await
             .map_err(|e| AuthError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(Empty {}))
+        Ok(tonic::Response::new(()))
     }
 }
 

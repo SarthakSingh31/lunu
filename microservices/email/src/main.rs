@@ -1,6 +1,6 @@
 use lunu::{
     dotenvy::dotenv,
-    email::{mail_server::MailServer, Email, Empty},
+    email::{mail_server::MailServer, Email},
     Microservice, MICROSERVICE_ADDRS,
 };
 use tonic::transport::Server;
@@ -12,7 +12,7 @@ impl lunu::email::mail_server::Mail for Mail {
     async fn send(
         &self,
         request: tonic::Request<Email>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let Email {
             email,
             subject,
@@ -21,7 +21,7 @@ impl lunu::email::mail_server::Mail for Mail {
 
         println!("Dummy sent email to {email}.\nSubject: {subject}\n{body_html}");
 
-        Ok(tonic::Response::new(Empty {}))
+        Ok(tonic::Response::new(()))
     }
 }
 

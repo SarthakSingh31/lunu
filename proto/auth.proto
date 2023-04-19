@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package auth;
 
+import "google/protobuf/empty.proto";
+
 enum Scope {
   PUBLIC = 0;
   CUSTOMER = 1;
@@ -41,15 +43,13 @@ message PasswordParams {
   string password = 2;
 }
 
-message Empty {}
-
 service Auth {
   rpc FetchAccount(SessionToken) returns (OptionalAccount) {}
   rpc CreateEmailLoginIntent(AccountEmail) returns (EmailLoginIntent) {}
   rpc LoginWithEmailLogin(EmailLoginParams) returns (SessionToken) {}
-  rpc CreateNewPassLoginIntent(AccountEmail) returns (Empty) {}
+  rpc CreateNewPassLoginIntent(AccountEmail) returns (google.protobuf.Empty) {}
   rpc LoginWithNewPassLogin(NewPassLoginParams) returns (SessionToken) {}
   rpc CreateWithPassword(PasswordParams) returns (SessionToken) {}
   rpc LoginWithPassword(PasswordParams) returns (SessionToken) {}
-  rpc CleanupDB(Empty) returns (Empty) {}
+  rpc CleanupDB(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }

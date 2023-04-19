@@ -2,10 +2,25 @@ syntax = "proto3";
 
 package account;
 
+import "google/protobuf/empty.proto";
+
 enum Approval {
   OnHold = 0;
   Approved = 1;
   Rejected = 2;
+}
+
+enum KycLevel {
+  Level0 = 0;
+  Level1 = 1;
+  Level2 = 2;
+  Level3 = 3;
+}
+
+enum LimitPeriod {
+  Daily = 0;
+  Weekly = 1;
+  Monthly = 2;
 }
 
 message CustomerDesc {
@@ -25,11 +40,9 @@ message UpdateApproval {
   Approval approval = 2;
 }
 
-message Empty {}
-
 service Account {
   rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
   rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
-  rpc UpdateApprovalCustomer(UpdateApproval) returns (Empty) {}
-  rpc UpdateApprovalRetailer(UpdateApproval) returns (Empty) {}
+  rpc UpdateApprovalCustomer(UpdateApproval) returns (google.protobuf.Empty) {}
+  rpc UpdateApprovalRetailer(UpdateApproval) returns (google.protobuf.Empty) {}
 }
