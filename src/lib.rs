@@ -66,6 +66,8 @@ pub mod auth {
 
 #[cfg(feature = "account")]
 pub mod account {
+    use bigdecimal::{num_bigint::BigInt, BigDecimal};
+
     tonic::include_proto!("account");
 
     #[cfg(feature = "db")]
@@ -75,6 +77,17 @@ pub mod account {
                 Approval::Approved => super::models::Approval::Approved,
                 Approval::Rejected => super::models::Approval::Rejected,
                 Approval::OnHold => super::models::Approval::OnHold,
+            }
+        }
+    }
+
+    #[cfg(feature = "db")]
+    impl From<super::models::Approval> for Approval {
+        fn from(val: super::models::Approval) -> Approval {
+            match val {
+                super::models::Approval::Approved => Approval::Approved,
+                super::models::Approval::Rejected => Approval::Rejected,
+                super::models::Approval::OnHold => Approval::OnHold,
             }
         }
     }
@@ -180,6 +193,26 @@ pub mod account {
                     })
                     .collect(),
             }
+        }
+    }
+
+    impl From<(String, BigDecimal)> for Money {
+        fn from((currency_code, amount): (String, BigDecimal)) -> Self {
+            let (digits, exponent) = amount.into_bigint_and_exponent();
+            Money {
+                currency_code,
+                digits: digits.to_signed_bytes_le(),
+                exponent,
+            }
+        }
+    }
+
+    impl Into<(String, BigDecimal)> for Money {
+        fn into(self) -> (String, BigDecimal) {
+            (
+                self.currency_code,
+                BigDecimal::new(BigInt::from_signed_bytes_le(&self.digits), self.exponent),
+            )
         }
     }
 }

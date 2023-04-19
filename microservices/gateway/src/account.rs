@@ -6,7 +6,7 @@ use actix_web::{
 use lunu::{
     account::{
         Approval, CustomerDesc, CustomerId, LimitLevel, LimitPeriod, Limits, Money, RetailerDesc,
-        RetailerId, SetApproval, SetLimit, SetLimitGlobal,
+        RetailerId, SetApproval, SetLimit, SetLimitGlobal, SetMinPurchase,
     },
     auth::Scope,
 };
@@ -123,8 +123,53 @@ pub async fn create_retailer(user: User, params: Json<RetailerParams>) -> impl R
     }
 }
 
+#[actix_web::get("/customer/{customer_id}/approval")]
+pub async fn get_approval_customer(user: User, path: web::Path<String>) -> impl Responder {
+    let User::Authenticated { customer_id, scopes , .. } = user else {
+        return (
+            Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let in_customer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) && customer_id != Some(in_customer_id.clone()) {
+        return (
+            Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .get_approval_customer(CustomerId { id: in_customer_id })
+        .await
+    {
+        Ok(resp) => (
+            Json(serde_json::json!({
+                "approval": resp.into_inner().approval(),
+            })),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
 #[actix_web::post("/customer/{customer_id}/approval")]
-pub async fn update_approval_customer(
+pub async fn set_approval_customer(
     user: User,
     path: web::Path<String>,
     params: Json<Approval>,
@@ -176,8 +221,53 @@ pub async fn update_approval_customer(
     }
 }
 
+#[actix_web::get("/retailer/{retailer_id}/approval")]
+pub async fn get_approval_retailer(user: User, path: web::Path<String>) -> impl Responder {
+    let User::Authenticated { retailer_id, scopes , .. } = user else {
+        return (
+            Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let in_retailer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) && retailer_id != Some(in_retailer_id.clone()) {
+        return (
+            Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .get_approval_retailer(RetailerId { id: in_retailer_id })
+        .await
+    {
+        Ok(resp) => (
+            Json(serde_json::json!({
+                "approval": resp.into_inner().approval(),
+            })),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
 #[actix_web::post("/retailer/{retailer_id}/approval")]
-pub async fn update_approval_retailer(
+pub async fn set_approval_retailer(
     user: User,
     path: web::Path<String>,
     params: Json<Approval>,
@@ -481,6 +571,98 @@ pub async fn set_global_limits(user: User, param: Json<SetLimitParams>) -> impl 
             period: param.period as i32,
             level: param.level as i32,
             amount: Some(param.0.amount),
+        })
+        .await
+    {
+        Ok(_) => (
+            Json(serde_json::json!({
+                "success": [],
+            })),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Json(serde_json::json!({
+                "error": status.message(),
+            })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::get("/customer/{customer_id}/min_purchase_limit")]
+pub async fn get_min_purchase_limit(user: User, path: web::Path<String>) -> impl Responder {
+    let User::Authenticated { customer_id, scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let in_customer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) && customer_id != Some(in_customer_id.clone()) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .get_min_purchase_value(CustomerId { id: in_customer_id })
+        .await
+    {
+        Ok(resp) => (Either::Left(Json(resp.into_inner())), StatusCode::OK),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::post("/customer/{customer_id}/min_purchase_limit")]
+pub async fn set_min_purchase_limit(
+    user: User,
+    path: web::Path<String>,
+    param: Json<Money>,
+) -> impl Responder {
+    let User::Authenticated { scopes , .. } = user else {
+        return (
+            Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let customer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) {
+        return (
+            Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            })),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .set_min_purchase_value(SetMinPurchase {
+            customer_id,
+            amount: Some(param.0),
         })
         .await
     {

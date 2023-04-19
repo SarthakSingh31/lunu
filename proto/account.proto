@@ -48,6 +48,8 @@ message CustomerId { string id = 1; }
 
 message RetailerId { string id = 1; }
 
+message GetApproval { Approval approval = 1; }
+
 message SetApproval {
   string id = 1;
   Approval approval = 2;
@@ -68,10 +70,17 @@ message SetLimitGlobal {
 
 message InnerLimits { map<uint32, Money> limit_map = 1; }
 
+message SetMinPurchase {
+  string customer_id = 1;
+  Money amount = 2;
+}
+
 service Account {
   rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
   rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
+  rpc GetApprovalCustomer(CustomerId) returns (GetApproval) {}
   rpc SetApprovalCustomer(SetApproval) returns (google.protobuf.Empty) {}
+  rpc GetApprovalRetailer(RetailerId) returns (GetApproval) {}
   rpc SetApprovalRetailer(SetApproval) returns (google.protobuf.Empty) {}
   rpc GetCustomerLimits(CustomerId) returns (InnerLimits) {}
   rpc SetCustomerLimit(SetLimit) returns (google.protobuf.Empty) {}
@@ -79,4 +88,6 @@ service Account {
   rpc SetRetailerLimit(SetLimit) returns (google.protobuf.Empty) {}
   rpc GetGlobalLimits(google.protobuf.Empty) returns (InnerLimits) {}
   rpc SetGlobalLimit(SetLimitGlobal) returns (google.protobuf.Empty) {}
+  rpc GetMinPurchaseValue(CustomerId) returns (Money) {}
+  rpc SetMinPurchaseValue(SetMinPurchase) returns (google.protobuf.Empty) {}
 }

@@ -3,7 +3,10 @@ fn main() {
         .compile(&["proto/auth.proto"], &["proto"])
         .unwrap();
     tonic_build::configure()
-        .type_attribute("Approval", "#[derive(serde::Deserialize)]")
+        .type_attribute(
+            "Approval",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
         .type_attribute(
             "LimitLevel",
             "#[derive(serde::Serialize, serde::Deserialize)]",

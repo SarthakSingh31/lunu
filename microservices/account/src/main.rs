@@ -3,8 +3,9 @@ use std::{env, str::FromStr};
 use bigdecimal::{num_bigint::BigInt, BigDecimal};
 use lunu::{
     account::{
-        account_server::AccountServer, CustomerDesc, CustomerId, InnerLimits, Limits, Money,
-        RetailerDesc, RetailerId, SetApproval, SetLimit, SetLimitGlobal,
+        account_server::AccountServer, Approval, CustomerDesc, CustomerId, GetApproval,
+        InnerLimits, Limits, Money, RetailerDesc, RetailerId, SetApproval, SetLimit,
+        SetLimitGlobal, SetMinPurchase,
     },
     diesel::{insert_into, update, ExpressionMethods, QueryDsl},
     diesel_async::{
@@ -85,6 +86,35 @@ impl lunu::account::account_server::Account for Account {
         Ok(tonic::Response::new(RetailerId { id: id.to_string() }))
     }
 
+    async fn get_approval_customer(
+        &self,
+        request: tonic::Request<CustomerId>,
+    ) -> Result<tonic::Response<GetApproval>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let id = Uuid::from_str(&request.into_inner().id)
+            .map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::customers::dsl as c_dsl;
+
+        let approval: Approval = c_dsl::customers
+            .filter(c_dsl::id.eq(id))
+            .select(c_dsl::approved)
+            .load::<models::Approval>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?
+            .pop()
+            .ok_or(AccountError::CustomerNotFound)?
+            .into();
+
+        Ok(tonic::Response::new(GetApproval {
+            approval: approval as i32,
+        }))
+    }
+
     async fn set_approval_customer(
         &self,
         request: tonic::Request<SetApproval>,
@@ -117,6 +147,35 @@ impl lunu::account::account_server::Account for Account {
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
 
         Ok(tonic::Response::new(()))
+    }
+
+    async fn get_approval_retailer(
+        &self,
+        request: tonic::Request<RetailerId>,
+    ) -> Result<tonic::Response<GetApproval>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let id = Uuid::from_str(&request.into_inner().id)
+            .map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::retailers::dsl as r_dsl;
+
+        let approval: Approval = r_dsl::retailers
+            .filter(r_dsl::id.eq(id))
+            .select(r_dsl::approved)
+            .load::<models::Approval>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?
+            .pop()
+            .ok_or(AccountError::RetailerNotFound)?
+            .into();
+
+        Ok(tonic::Response::new(GetApproval {
+            approval: approval as i32,
+        }))
     }
 
     async fn set_approval_retailer(
@@ -353,13 +412,7 @@ impl lunu::account::account_server::Account for Account {
             limits
                 .into_iter()
                 .map(|(period, level, amount, currency)| {
-                    let (digits, exponent) = amount.into_bigint_and_exponent();
-                    let money = Money {
-                        currency_code: currency,
-                        digits: digits.to_signed_bytes_le(),
-                        exponent,
-                    };
-                    ((period.into(), level.into()), money)
+                    ((period.into(), level.into()), (currency, amount).into())
                 })
                 .collect(),
         );
@@ -386,24 +439,79 @@ impl lunu::account::account_server::Account for Account {
 
         use schema::global_limits::dsl as gl_dsl;
 
+        let (currency, amount) = amount.into();
+
         insert_into(gl_dsl::global_limits)
             .values(models::GlobalLimit {
                 period,
                 level,
-                amount: BigDecimal::new(
-                    BigInt::from_signed_bytes_le(&amount.digits),
-                    amount.exponent,
-                ),
-                currency: amount.currency_code.as_str(),
+                amount: amount.clone(),
+                currency: &currency,
             })
             .on_conflict((gl_dsl::period, gl_dsl::level))
             .do_update()
             .set((
-                gl_dsl::amount.eq(BigDecimal::new(
-                    BigInt::from_signed_bytes_le(&amount.digits),
-                    amount.exponent,
-                )),
-                gl_dsl::currency.eq(amount.currency_code.as_str()),
+                gl_dsl::amount.eq(amount),
+                gl_dsl::currency.eq(currency.as_str()),
+            ))
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn get_min_purchase_value(
+        &self,
+        request: tonic::Request<CustomerId>,
+    ) -> Result<tonic::Response<Money>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let id = Uuid::from_str(&request.into_inner().id)
+            .map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::customers::dsl as c_dsl;
+
+        let money = c_dsl::customers
+            .filter(c_dsl::id.eq(id))
+            .select((c_dsl::min_purchase_currency, c_dsl::min_purchase_amount))
+            .load::<(String, BigDecimal)>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?
+            .pop()
+            .ok_or(AccountError::CustomerNotFound)?
+            .into();
+
+        Ok(tonic::Response::new(money))
+    }
+
+    async fn set_min_purchase_value(
+        &self,
+        request: tonic::Request<SetMinPurchase>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let SetMinPurchase {
+            customer_id,
+            amount,
+        } = request.into_inner();
+        let id = Uuid::from_str(&customer_id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let (currency, amount): (String, BigDecimal) =
+            amount.ok_or(AccountError::MissingAmount)?.into();
+
+        use schema::customers::dsl as c_dsl;
+
+        update(c_dsl::customers)
+            .filter(c_dsl::id.eq(id))
+            .set((
+                c_dsl::min_purchase_currency.eq(currency),
+                c_dsl::min_purchase_amount.eq(amount),
             ))
             .execute(conn)
             .await
@@ -418,6 +526,8 @@ enum AccountError {
     QueryFailed(String),
     PoolConnectionFailed,
     MissingAmount,
+    CustomerNotFound,
+    RetailerNotFound,
 }
 
 impl From<AccountError> for tonic::Status {
@@ -432,6 +542,12 @@ impl From<AccountError> for tonic::Status {
             }
             AccountError::MissingAmount => {
                 tonic::Status::invalid_argument("Missing amount from request")
+            }
+            AccountError::CustomerNotFound => {
+                tonic::Status::invalid_argument("Customer with the supplied id was not found")
+            }
+            AccountError::RetailerNotFound => {
+                tonic::Status::invalid_argument("Retailer with the supplied id was not found")
             }
         }
     }

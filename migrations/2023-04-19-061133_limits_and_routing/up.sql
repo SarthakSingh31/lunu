@@ -52,6 +52,9 @@ CREATE TABLE global_limits (
     PRIMARY KEY (level, period)
 );
 
+ALTER TABLE customers ADD min_purchase_amount NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE customers ADD min_purchase_currency TEXT NOT NULL DEFAULT 0;
+
 INSERT INTO global_limits VALUES
     ('Daily', 'KycLevel0', 0, 'USD'),
     ('Daily', 'KycLevel1', 0, 'USD'),

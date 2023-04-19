@@ -60,6 +60,8 @@ diesel::table! {
         residence_address -> Nullable<Text>,
         country_of_residence -> Nullable<Text>,
         account_id -> Nullable<Uuid>,
+        min_purchase_amount -> Numeric,
+        min_purchase_currency -> Text,
     }
 }
 
