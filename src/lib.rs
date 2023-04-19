@@ -151,6 +151,8 @@ pub mod account {
         }
     }
 
+    #[derive(serde::Serialize)]
+    #[serde(transparent)]
     pub struct Limits(pub super::HashMap<(LimitPeriod, LimitLevel), Money>);
 
     impl From<InnerLimits> for Limits {

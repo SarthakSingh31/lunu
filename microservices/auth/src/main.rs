@@ -195,9 +195,31 @@ impl lunu::auth::auth_server::Auth for Auth {
                 .map(|kind| kind as i32)
                 .collect();
 
+            use schema::customers::dsl as c_dsl;
+
+            let customer_id = c_dsl::customers
+                .select(c_dsl::id)
+                .filter(c_dsl::account_id.eq(id))
+                .load::<Uuid>(conn)
+                .await
+                .map_err(|e| AuthError::QueryFailed(e.to_string()))?
+                .pop();
+
+            use schema::retailers::dsl as r_dsl;
+
+            let retailer_id = r_dsl::retailers
+                .select(r_dsl::id)
+                .filter(r_dsl::account_id.eq(id))
+                .load::<Uuid>(conn)
+                .await
+                .map_err(|e| AuthError::QueryFailed(e.to_string()))?
+                .pop();
+
             Ok(tonic::Response::new(OptionalAccount {
                 account: Some(Account {
                     id: id.to_string(),
+                    customer_id: customer_id.map(|id| id.to_string()),
+                    retailer_id: retailer_id.map(|id| id.to_string()),
                     scopes,
                 }),
                 password_login,

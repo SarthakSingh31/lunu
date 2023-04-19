@@ -10,6 +10,8 @@ use crate::{tonic_code_to_status_code, AUTH_CLIENT};
 pub enum User {
     Authenticated {
         account_id: String,
+        customer_id: Option<String>,
+        retailer_id: Option<String>,
         scopes: HashSet<Scope>,
         password_login: bool,
     },
@@ -77,6 +79,8 @@ impl FromRequest for User {
                     Ok(User::Authenticated {
                         scopes: acc.scopes().collect(),
                         account_id: acc.id,
+                        customer_id: acc.customer_id,
+                        retailer_id: acc.retailer_id,
                         password_login: account.password_login,
                     })
                 } else {

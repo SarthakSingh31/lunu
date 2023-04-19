@@ -4,9 +4,15 @@ fn main() {
         .unwrap();
     tonic_build::configure()
         .type_attribute("Approval", "#[derive(serde::Deserialize)]")
-        .type_attribute("LimitLevel", "#[derive(serde::Deserialize)]")
-        .type_attribute("LimitPeriod", "#[derive(serde::Deserialize)]")
-        .type_attribute("Money", "#[derive(serde::Deserialize)]")
+        .type_attribute(
+            "LimitLevel",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute(
+            "LimitPeriod",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute("Money", "#[derive(serde::Serialize, serde::Deserialize)]")
         .compile(&["proto/account.proto"], &["proto"])
         .unwrap();
     tonic_build::configure()

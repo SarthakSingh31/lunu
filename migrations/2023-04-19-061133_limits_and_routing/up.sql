@@ -51,3 +51,20 @@ CREATE TABLE global_limits (
 
     PRIMARY KEY (level, period)
 );
+
+INSERT INTO global_limits VALUES
+    ('Daily', 'KycLevel0', 0, 'USD'),
+    ('Daily', 'KycLevel1', 0, 'USD'),
+    ('Daily', 'KycLevel2', 0, 'USD'),
+    ('Daily', 'KycLevel3', 0, 'USD'),
+    ('Daily', 'Overall', 0, 'USD'),
+    ('Weekly', 'KycLevel0', 0, 'USD'),
+    ('Weekly', 'KycLevel1', 0, 'USD'),
+    ('Weekly', 'KycLevel2', 0, 'USD'),
+    ('Weekly', 'KycLevel3', 0, 'USD'),
+    ('Weekly', 'Overall', 0, 'USD'),
+    ('Monthly', 'KycLevel0', 0, 'USD'),
+    ('Monthly', 'KycLevel1', 0, 'USD'),
+    ('Monthly', 'KycLevel2', 0, 'USD'),
+    ('Monthly', 'KycLevel3', 0, 'USD'),
+    ('Monthly', 'Overall', 0, 'USD');
