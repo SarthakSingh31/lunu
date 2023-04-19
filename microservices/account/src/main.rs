@@ -1,11 +1,12 @@
 use std::{env, str::FromStr};
 
+use bigdecimal::{num_bigint::BigInt, BigDecimal};
 use lunu::{
     account::{
-        account_server::AccountServer, CustomerDesc, CustomerId, RetailerDesc, RetailerId,
-        UpdateApproval,
+        account_server::AccountServer, CustomerDesc, CustomerId, InnerLimits, Limits, Money,
+        RetailerDesc, RetailerId, SetApproval, SetLimit, SetLimitGlobal,
     },
-    diesel::{insert_into, update, ExpressionMethods},
+    diesel::{insert_into, update, ExpressionMethods, QueryDsl},
     diesel_async::{
         pooled_connection::{bb8::Pool, AsyncDieselConnectionManager},
         AsyncPgConnection, RunQueryDsl,
@@ -84,16 +85,16 @@ impl lunu::account::account_server::Account for Account {
         Ok(tonic::Response::new(RetailerId { id: id.to_string() }))
     }
 
-    async fn update_approval_customer(
+    async fn set_approval_customer(
         &self,
-        request: tonic::Request<UpdateApproval>,
+        request: tonic::Request<SetApproval>,
     ) -> Result<tonic::Response<()>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
             .await
             .map_err(|_| AccountError::PoolConnectionFailed)?;
-        let u_approval: UpdateApproval = request.into_inner();
+        let u_approval: SetApproval = request.into_inner();
         let id = Uuid::from_str(&u_approval.id).map_err(|_| AccountError::MalformedAccountToken)?;
         let approval: models::Approval = u_approval.approval().into();
 
@@ -118,16 +119,16 @@ impl lunu::account::account_server::Account for Account {
         Ok(tonic::Response::new(()))
     }
 
-    async fn update_approval_retailer(
+    async fn set_approval_retailer(
         &self,
-        request: tonic::Request<UpdateApproval>,
+        request: tonic::Request<SetApproval>,
     ) -> Result<tonic::Response<()>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
             .await
             .map_err(|_| AccountError::PoolConnectionFailed)?;
-        let u_approval: UpdateApproval = request.into_inner();
+        let u_approval: SetApproval = request.into_inner();
         let id = Uuid::from_str(&u_approval.id).map_err(|_| AccountError::MalformedAccountToken)?;
         let approval: models::Approval = u_approval.approval().into();
 
@@ -151,12 +152,272 @@ impl lunu::account::account_server::Account for Account {
 
         Ok(tonic::Response::new(()))
     }
+
+    async fn get_customer_limits(
+        &self,
+        request: tonic::Request<CustomerId>,
+    ) -> Result<tonic::Response<InnerLimits>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let CustomerId { id } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::customer_limits::dsl as cl_dsl;
+
+        let limits = cl_dsl::customer_limits
+            .select((
+                cl_dsl::period,
+                cl_dsl::level,
+                cl_dsl::amount,
+                cl_dsl::currency,
+            ))
+            .filter(cl_dsl::customer_id.eq(id))
+            .load::<(models::LimitPeriod, models::LimitLevel, BigDecimal, String)>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+        let limits = Limits(
+            limits
+                .into_iter()
+                .map(|(period, level, amount, currency)| {
+                    let (digits, exponent) = amount.into_bigint_and_exponent();
+                    let money = Money {
+                        currency_code: currency,
+                        digits: digits.to_signed_bytes_le(),
+                        exponent,
+                    };
+                    ((period.into(), level.into()), money)
+                })
+                .collect(),
+        );
+
+        Ok(tonic::Response::new(limits.into()))
+    }
+
+    async fn set_customer_limit(
+        &self,
+        request: tonic::Request<SetLimit>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let limit = request.into_inner();
+
+        let period = limit.period().into();
+        let level = limit.level().into();
+        let id = Uuid::from_str(&limit.id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let Some(amount) = limit.amount else {
+            return Err(AccountError::MissingAmount.into());
+        };
+
+        use schema::customer_limits::dsl as cl_dsl;
+
+        insert_into(cl_dsl::customer_limits)
+            .values(models::CustomerLimit {
+                period,
+                level,
+                amount: BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                ),
+                currency: amount.currency_code.as_str(),
+                customer_id: id,
+            })
+            .on_conflict((cl_dsl::period, cl_dsl::level, cl_dsl::customer_id))
+            .do_update()
+            .set((
+                cl_dsl::amount.eq(BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                )),
+                cl_dsl::currency.eq(amount.currency_code.as_str()),
+            ))
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn get_retailer_limits(
+        &self,
+        request: tonic::Request<RetailerId>,
+    ) -> Result<tonic::Response<InnerLimits>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let RetailerId { id } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::retailer_limits::dsl as rl_dsl;
+
+        let limits = rl_dsl::retailer_limits
+            .select((
+                rl_dsl::period,
+                rl_dsl::level,
+                rl_dsl::amount,
+                rl_dsl::currency,
+            ))
+            .filter(rl_dsl::retailer_id.eq(id))
+            .load::<(models::LimitPeriod, models::LimitLevel, BigDecimal, String)>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+        let limits = Limits(
+            limits
+                .into_iter()
+                .map(|(period, level, amount, currency)| {
+                    let (digits, exponent) = amount.into_bigint_and_exponent();
+                    let money = Money {
+                        currency_code: currency,
+                        digits: digits.to_signed_bytes_le(),
+                        exponent,
+                    };
+                    ((period.into(), level.into()), money)
+                })
+                .collect(),
+        );
+
+        Ok(tonic::Response::new(limits.into()))
+    }
+
+    async fn set_retailer_limit(
+        &self,
+        request: tonic::Request<SetLimit>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let limit = request.into_inner();
+
+        let period = limit.period().into();
+        let level = limit.level().into();
+        let id = Uuid::from_str(&limit.id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let Some(amount) = limit.amount else {
+            return Err(AccountError::MissingAmount.into());
+        };
+
+        use schema::retailer_limits::dsl as rl_dsl;
+
+        insert_into(rl_dsl::retailer_limits)
+            .values(models::RetailerLimit {
+                period,
+                level,
+                amount: BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                ),
+                currency: amount.currency_code.as_str(),
+                retailer_id: id,
+            })
+            .on_conflict((rl_dsl::period, rl_dsl::level, rl_dsl::retailer_id))
+            .do_update()
+            .set((
+                rl_dsl::amount.eq(BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                )),
+                rl_dsl::currency.eq(amount.currency_code.as_str()),
+            ))
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn get_global_limits(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<tonic::Response<InnerLimits>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        use schema::global_limits::dsl as gl_dsl;
+
+        let limits = gl_dsl::global_limits
+            .load::<(models::LimitPeriod, models::LimitLevel, BigDecimal, String)>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+        let limits = Limits(
+            limits
+                .into_iter()
+                .map(|(period, level, amount, currency)| {
+                    let (digits, exponent) = amount.into_bigint_and_exponent();
+                    let money = Money {
+                        currency_code: currency,
+                        digits: digits.to_signed_bytes_le(),
+                        exponent,
+                    };
+                    ((period.into(), level.into()), money)
+                })
+                .collect(),
+        );
+
+        Ok(tonic::Response::new(limits.into()))
+    }
+
+    async fn set_global_limit(
+        &self,
+        request: tonic::Request<SetLimitGlobal>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+        let limit = request.into_inner();
+
+        let period = limit.period().into();
+        let level = limit.level().into();
+        let Some(amount) = limit.amount else {
+            return Err(AccountError::MissingAmount.into());
+        };
+
+        use schema::global_limits::dsl as gl_dsl;
+
+        insert_into(gl_dsl::global_limits)
+            .values(models::GlobalLimit {
+                period,
+                level,
+                amount: BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                ),
+                currency: amount.currency_code.as_str(),
+            })
+            .on_conflict((gl_dsl::period, gl_dsl::level))
+            .do_update()
+            .set((
+                gl_dsl::amount.eq(BigDecimal::new(
+                    BigInt::from_signed_bytes_le(&amount.digits),
+                    amount.exponent,
+                )),
+                gl_dsl::currency.eq(amount.currency_code.as_str()),
+            ))
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
+    }
 }
 
 enum AccountError {
     MalformedAccountToken,
     QueryFailed(String),
     PoolConnectionFailed,
+    MissingAmount,
 }
 
 impl From<AccountError> for tonic::Status {
@@ -168,6 +429,9 @@ impl From<AccountError> for tonic::Status {
             AccountError::QueryFailed(s) => tonic::Status::internal(format!("Query Failed: {s}")),
             AccountError::PoolConnectionFailed => {
                 tonic::Status::internal("Failed to connect to the internal pool")
+            }
+            AccountError::MissingAmount => {
+                tonic::Status::invalid_argument("Missing amount from request")
             }
         }
     }

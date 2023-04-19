@@ -1,9 +1,10 @@
 use std::io::Write;
 
+use bigdecimal::BigDecimal;
 use diesel::{
     deserialize,
     pg::{Pg, PgValue},
-    serialize, AsExpression, FromSqlRow, Insertable, Queryable,
+    serialize, AsChangeset, AsExpression, FromSqlRow, Insertable, Queryable,
 };
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -109,6 +110,72 @@ impl deserialize::FromSql<crate::schema::sql_types::Approval, Pg> for Approval {
     }
 }
 
+#[derive(Debug, AsExpression, FromSqlRow, serde::Deserialize)]
+#[diesel(sql_type = crate::schema::sql_types::LimitLevel)]
+pub enum LimitLevel {
+    KycLevel0 = 0,
+    KycLevel1 = 1,
+    KycLevel2 = 2,
+    KycLevel3 = 3,
+    Overall = 4,
+}
+
+impl serialize::ToSql<crate::schema::sql_types::LimitLevel, Pg> for LimitLevel {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Pg>) -> serialize::Result {
+        match *self {
+            LimitLevel::KycLevel0 => out.write_all(b"KycLevel0")?,
+            LimitLevel::KycLevel1 => out.write_all(b"KycLevel1")?,
+            LimitLevel::KycLevel2 => out.write_all(b"KycLevel2")?,
+            LimitLevel::KycLevel3 => out.write_all(b"KycLevel3")?,
+            LimitLevel::Overall => out.write_all(b"Overall")?,
+        }
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl deserialize::FromSql<crate::schema::sql_types::LimitLevel, Pg> for LimitLevel {
+    fn from_sql(bytes: PgValue) -> deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"KycLevel0" => Ok(LimitLevel::KycLevel0),
+            b"KycLevel1" => Ok(LimitLevel::KycLevel1),
+            b"KycLevel2" => Ok(LimitLevel::KycLevel2),
+            b"KycLevel3" => Ok(LimitLevel::KycLevel3),
+            b"Overall" => Ok(LimitLevel::Overall),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
+#[derive(Debug, AsExpression, FromSqlRow, serde::Deserialize)]
+#[diesel(sql_type = crate::schema::sql_types::LimitPeriod)]
+pub enum LimitPeriod {
+    Daily = 0,
+    Weekly = 1,
+    Monthly = 2,
+}
+
+impl serialize::ToSql<crate::schema::sql_types::LimitPeriod, Pg> for LimitPeriod {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Pg>) -> serialize::Result {
+        match *self {
+            LimitPeriod::Daily => out.write_all(b"Daily")?,
+            LimitPeriod::Weekly => out.write_all(b"Weekly")?,
+            LimitPeriod::Monthly => out.write_all(b"Monthly")?,
+        }
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl deserialize::FromSql<crate::schema::sql_types::LimitPeriod, Pg> for LimitPeriod {
+    fn from_sql(bytes: PgValue) -> deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"Daily" => Ok(LimitPeriod::Daily),
+            b"Weekly" => Ok(LimitPeriod::Weekly),
+            b"Monthly" => Ok(LimitPeriod::Monthly),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = schema::accounts)]
 pub struct Account<'s> {
@@ -171,4 +238,33 @@ pub struct Customer {
 pub struct Retailer {
     pub id: Uuid,
     pub account_id: Uuid,
+}
+
+#[derive(Queryable, Insertable, AsChangeset)]
+#[diesel(table_name = schema::customer_limits)]
+pub struct CustomerLimit<'cl> {
+    pub period: LimitPeriod,
+    pub level: LimitLevel,
+    pub amount: BigDecimal,
+    pub currency: &'cl str,
+    pub customer_id: Uuid,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = schema::retailer_limits)]
+pub struct RetailerLimit<'rl> {
+    pub period: LimitPeriod,
+    pub level: LimitLevel,
+    pub amount: BigDecimal,
+    pub currency: &'rl str,
+    pub retailer_id: Uuid,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = schema::global_limits)]
+pub struct GlobalLimit<'rl> {
+    pub period: LimitPeriod,
+    pub level: LimitLevel,
+    pub amount: BigDecimal,
+    pub currency: &'rl str,
 }

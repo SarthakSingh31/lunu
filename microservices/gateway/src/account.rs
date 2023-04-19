@@ -4,7 +4,7 @@ use actix_web::{
     Responder,
 };
 use lunu::{
-    account::{Approval, CustomerDesc, RetailerDesc, UpdateApproval},
+    account::{Approval, CustomerDesc, RetailerDesc, SetApproval},
     auth::Scope,
 };
 
@@ -153,7 +153,7 @@ pub async fn update_approval_customer(
         .clone();
 
     let test = client
-        .update_approval_customer(UpdateApproval {
+        .set_approval_customer(SetApproval {
             id: customer_id,
             approval: params.0 as i32,
         })
@@ -206,7 +206,7 @@ pub async fn update_approval_retailer(
         .clone();
 
     let test = client
-        .update_approval_retailer(UpdateApproval {
+        .set_approval_retailer(SetApproval {
             id: retailer_id,
             approval: params.0 as i32,
         })

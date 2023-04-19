@@ -10,17 +10,30 @@ enum Approval {
   Rejected = 2;
 }
 
-enum KycLevel {
-  Level0 = 0;
-  Level1 = 1;
-  Level2 = 2;
-  Level3 = 3;
+enum LimitLevel {
+  KycLevel0 = 0;
+  KycLevel1 = 1;
+  KycLevel2 = 2;
+  KycLevel3 = 3;
+  Overall = 4;
 }
 
 enum LimitPeriod {
   Daily = 0;
   Weekly = 1;
   Monthly = 2;
+}
+
+// Represents an amount of money with its currency type.
+message Money {
+  // The three-letter currency code defined in ISO 4217.
+  string currency_code = 1;
+
+  // The digits of the number
+  bytes digits = 2;
+
+  // The exponent of the floating point number
+  int64 exponent = 3;
 }
 
 message CustomerDesc {
@@ -35,14 +48,35 @@ message CustomerId { string id = 1; }
 
 message RetailerId { string id = 1; }
 
-message UpdateApproval {
+message SetApproval {
   string id = 1;
   Approval approval = 2;
 }
 
+message SetLimit {
+  string id = 1;
+  LimitPeriod period = 2;
+  LimitLevel level = 3;
+  Money amount = 4;
+}
+
+message SetLimitGlobal {
+  LimitPeriod period = 2;
+  LimitLevel level = 3;
+  Money amount = 4;
+}
+
+message InnerLimits { map<uint32, Money> limit_map = 1; }
+
 service Account {
   rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
   rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
-  rpc UpdateApprovalCustomer(UpdateApproval) returns (google.protobuf.Empty) {}
-  rpc UpdateApprovalRetailer(UpdateApproval) returns (google.protobuf.Empty) {}
+  rpc SetApprovalCustomer(SetApproval) returns (google.protobuf.Empty) {}
+  rpc SetApprovalRetailer(SetApproval) returns (google.protobuf.Empty) {}
+  rpc GetCustomerLimits(CustomerId) returns (InnerLimits) {}
+  rpc SetCustomerLimit(SetLimit) returns (google.protobuf.Empty) {}
+  rpc GetRetailerLimits(RetailerId) returns (InnerLimits) {}
+  rpc SetRetailerLimit(SetLimit) returns (google.protobuf.Empty) {}
+  rpc GetGlobalLimits(google.protobuf.Empty) returns (InnerLimits) {}
+  rpc SetGlobalLimit(SetLimitGlobal) returns (google.protobuf.Empty) {}
 }

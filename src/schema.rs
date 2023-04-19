@@ -10,6 +10,14 @@ pub mod sql_types {
     pub struct KycLevel;
 
     #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "limit_level"))]
+    pub struct LimitLevel;
+
+    #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "limit_period"))]
+    pub struct LimitPeriod;
+
+    #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "scope"))]
     pub struct Scope;
 }
@@ -20,6 +28,20 @@ diesel::table! {
         email -> Text,
         created_at -> Timestamptz,
         blocked -> Bool,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::LimitPeriod;
+    use super::sql_types::LimitLevel;
+
+    customer_limits (level, period, customer_id) {
+        period -> LimitPeriod,
+        level -> LimitLevel,
+        amount -> Numeric,
+        currency -> Text,
+        customer_id -> Uuid,
     }
 }
 
@@ -51,6 +73,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::LimitPeriod;
+    use super::sql_types::LimitLevel;
+
+    global_limits (level, period) {
+        period -> LimitPeriod,
+        level -> LimitLevel,
+        amount -> Numeric,
+        currency -> Text,
+    }
+}
+
+diesel::table! {
     new_pass_login_intents (id) {
         id -> Text,
         account_id -> Uuid,
@@ -64,6 +99,20 @@ diesel::table! {
         hash -> Text,
         salt -> Text,
         created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::LimitPeriod;
+    use super::sql_types::LimitLevel;
+
+    retailer_limits (level, period, retailer_id) {
+        period -> LimitPeriod,
+        level -> LimitLevel,
+        amount -> Numeric,
+        currency -> Text,
+        retailer_id -> Uuid,
     }
 }
 
@@ -127,10 +176,12 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(customer_limits -> customers (customer_id));
 diesel::joinable!(customers -> accounts (account_id));
 diesel::joinable!(email_login_intents -> accounts (account_id));
 diesel::joinable!(new_pass_login_intents -> accounts (account_id));
 diesel::joinable!(password_login -> accounts (account_id));
+diesel::joinable!(retailer_limits -> retailers (retailer_id));
 diesel::joinable!(retailers -> accounts (account_id));
 diesel::joinable!(scopes -> accounts (account_id));
 diesel::joinable!(sessions -> accounts (account_id));
@@ -138,10 +189,13 @@ diesel::joinable!(transactions -> retailers (retailer_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
+    customer_limits,
     customers,
     email_login_intents,
+    global_limits,
     new_pass_login_intents,
     password_login,
+    retailer_limits,
     retailers,
     scopes,
     sessions,
