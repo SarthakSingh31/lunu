@@ -67,6 +67,7 @@ pub mod auth {
 #[cfg(feature = "account")]
 pub mod account {
     use bigdecimal::{num_bigint::BigInt, BigDecimal};
+    use uuid::Uuid;
 
     tonic::include_proto!("account");
 
@@ -215,6 +216,34 @@ pub mod account {
             )
         }
     }
+
+    impl From<(Uuid, String)> for Source {
+        fn from((id, name): (Uuid, String)) -> Self {
+            Source {
+                id: id.to_string(),
+                name,
+            }
+        }
+    }
+
+    // pub enum FromRoutingError {
+    //     MalformedUuid,
+    //     MissingAmount,
+    // }
+
+    // impl TryInto<((Uuid, String), (String, BigDecimal))> for RoutingEntry {
+    //     type Error = FromRoutingError;
+
+    //     fn try_into(self) -> Result<((Uuid, String), (String, BigDecimal)), Self::Error> {
+    //         Ok((
+    //             (
+    //                 Uuid::from_str(&self.id).map_err(|_| FromRoutingError::MalformedUuid)?,
+    //                 self.name,
+    //             ),
+    //             self.amount.ok_or(FromRoutingError::MissingAmount)?.into(),
+    //         ))
+    //     }
+    // }
 }
 
 #[cfg(feature = "storage")]

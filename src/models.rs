@@ -176,6 +176,49 @@ impl deserialize::FromSql<crate::schema::sql_types::LimitPeriod, Pg> for LimitPe
     }
 }
 
+#[derive(Debug, AsExpression, FromSqlRow)]
+#[diesel(sql_type = crate::schema::sql_types::ProfileIndex)]
+pub enum ProfileIndex {
+    Zero,
+    One,
+    Two,
+}
+
+impl serialize::ToSql<crate::schema::sql_types::ProfileIndex, Pg> for ProfileIndex {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Pg>) -> serialize::Result {
+        match *self {
+            ProfileIndex::Zero => out.write_all(b"0")?,
+            ProfileIndex::One => out.write_all(b"1")?,
+            ProfileIndex::Two => out.write_all(b"2")?,
+        }
+        Ok(serialize::IsNull::No)
+    }
+}
+
+impl deserialize::FromSql<crate::schema::sql_types::ProfileIndex, Pg> for ProfileIndex {
+    fn from_sql(bytes: PgValue) -> deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"0" => Ok(ProfileIndex::Zero),
+            b"1" => Ok(ProfileIndex::One),
+            b"2" => Ok(ProfileIndex::Two),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
+impl TryFrom<usize> for ProfileIndex {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(ProfileIndex::Zero),
+            1 => Ok(ProfileIndex::One),
+            2 => Ok(ProfileIndex::Two),
+            _ => Err(())
+        }
+    }
+}
+
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = schema::accounts)]
 pub struct Account<'s> {

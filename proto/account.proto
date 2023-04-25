@@ -75,19 +75,50 @@ message SetMinPurchase {
   Money amount = 2;
 }
 
+message Source {
+  string id = 1;
+  string name = 2;
+}
+
+message RoutingEntry {
+  Source source = 1;
+  Money amount = 2;
+}
+
+message Routing {
+  repeated RoutingEntry payment_gateways = 1;
+  repeated RoutingEntry custody_providers = 2;
+  repeated RoutingEntry exchange_providers = 3;
+}
+
+message SetRouting {
+  string id = 1;
+  Routing routing = 2;
+}
+
 service Account {
   rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
   rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
+
   rpc GetApprovalCustomer(CustomerId) returns (GetApproval) {}
   rpc SetApprovalCustomer(SetApproval) returns (google.protobuf.Empty) {}
   rpc GetApprovalRetailer(RetailerId) returns (GetApproval) {}
   rpc SetApprovalRetailer(SetApproval) returns (google.protobuf.Empty) {}
+
   rpc GetCustomerLimits(CustomerId) returns (InnerLimits) {}
   rpc SetCustomerLimit(SetLimit) returns (google.protobuf.Empty) {}
   rpc GetRetailerLimits(RetailerId) returns (InnerLimits) {}
   rpc SetRetailerLimit(SetLimit) returns (google.protobuf.Empty) {}
   rpc GetGlobalLimits(google.protobuf.Empty) returns (InnerLimits) {}
   rpc SetGlobalLimit(SetLimitGlobal) returns (google.protobuf.Empty) {}
+
   rpc GetMinPurchaseValue(CustomerId) returns (Money) {}
   rpc SetMinPurchaseValue(SetMinPurchase) returns (google.protobuf.Empty) {}
+
+  rpc GetCustomerRouting(CustomerId) returns (Routing) {}
+  rpc SetCustomerRouting(SetRouting) returns (google.protobuf.Empty) {}
+  rpc GetRetailerRouting(RetailerId) returns (Routing) {}
+  rpc SetRetailerRouting(SetRouting) returns (google.protobuf.Empty) {}
+  rpc GetGlobalRouting(google.protobuf.Empty) returns (Routing) {}
+  rpc SetGlobalRouting(Routing) returns (google.protobuf.Empty) {}
 }

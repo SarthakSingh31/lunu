@@ -1,11 +1,14 @@
+mod helpers;
+
 use std::{env, str::FromStr};
 
 use bigdecimal::{num_bigint::BigInt, BigDecimal};
+use helpers::routing::RoutingTable;
 use lunu::{
     account::{
         account_server::AccountServer, Approval, CustomerDesc, CustomerId, GetApproval,
-        InnerLimits, Limits, Money, RetailerDesc, RetailerId, SetApproval, SetLimit,
-        SetLimitGlobal, SetMinPurchase,
+        InnerLimits, Limits, Money, RetailerDesc, RetailerId, Routing, SetApproval, SetLimit,
+        SetLimitGlobal, SetMinPurchase, SetRouting,
     },
     diesel::{insert_into, update, ExpressionMethods, QueryDsl},
     diesel_async::{
@@ -519,15 +522,92 @@ impl lunu::account::account_server::Account for Account {
 
         Ok(tonic::Response::new(()))
     }
+
+    async fn get_customer_routing(
+        &self,
+        request: tonic::Request<CustomerId>,
+    ) -> Result<tonic::Response<Routing>, tonic::Status> {
+        let CustomerId { id } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        Ok(tonic::Response::new(
+            helpers::routing::CustomerRouting::get(&self.pool, id).await?,
+        ))
+    }
+
+    async fn set_customer_routing(
+        &self,
+        request: tonic::Request<SetRouting>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let SetRouting { id, routing } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let Some(routing) = routing else {
+            return Err(AccountError::MissingRoutingData.into());
+        };
+
+        Ok(tonic::Response::new(
+            helpers::routing::CustomerRouting::set(&self.pool, id, routing).await?,
+        ))
+    }
+
+    async fn get_retailer_routing(
+        &self,
+        request: tonic::Request<RetailerId>,
+    ) -> Result<tonic::Response<Routing>, tonic::Status> {
+        let RetailerId { id } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        Ok(tonic::Response::new(
+            helpers::routing::RetailerRouting::get(&self.pool, id).await?,
+        ))
+    }
+
+    async fn set_retailer_routing(
+        &self,
+        request: tonic::Request<SetRouting>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let SetRouting { id, routing } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let Some(routing) = routing else {
+            return Err(AccountError::MissingRoutingData.into());
+        };
+
+        Ok(tonic::Response::new(
+            helpers::routing::RetailerRouting::set(&self.pool, id, routing).await?,
+        ))
+    }
+
+    async fn get_global_routing(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<tonic::Response<Routing>, tonic::Status> {
+        Ok(tonic::Response::new(
+            helpers::routing::GlobalRouting::get(&self.pool, ()).await?,
+        ))
+    }
+
+    async fn set_global_routing(
+        &self,
+        request: tonic::Request<Routing>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let routing = request.into_inner();
+
+        Ok(tonic::Response::new(
+            helpers::routing::GlobalRouting::set(&self.pool, (), routing).await?,
+        ))
+    }
 }
 
 enum AccountError {
     MalformedAccountToken,
+    MalformedRoutingSourceToken,
     QueryFailed(String),
     PoolConnectionFailed,
     MissingAmount,
     CustomerNotFound,
     RetailerNotFound,
+    TooManyRouteEntries,
+    MissingRoutingData,
 }
 
 impl From<AccountError> for tonic::Status {
@@ -535,6 +615,9 @@ impl From<AccountError> for tonic::Status {
         match value {
             AccountError::MalformedAccountToken => {
                 tonic::Status::invalid_argument("Malformed session token")
+            }
+            AccountError::MalformedRoutingSourceToken => {
+                tonic::Status::invalid_argument("Malformed routing source token")
             }
             AccountError::QueryFailed(s) => tonic::Status::internal(format!("Query Failed: {s}")),
             AccountError::PoolConnectionFailed => {
@@ -548,6 +631,12 @@ impl From<AccountError> for tonic::Status {
             }
             AccountError::RetailerNotFound => {
                 tonic::Status::invalid_argument("Retailer with the supplied id was not found")
+            }
+            AccountError::TooManyRouteEntries => {
+                tonic::Status::invalid_argument("There were more entries than profile indexes")
+            }
+            AccountError::MissingRoutingData => {
+                tonic::Status::invalid_argument("Routing data was missing")
             }
         }
     }

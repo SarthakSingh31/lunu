@@ -6,7 +6,7 @@ use actix_web::{
 use lunu::{
     account::{
         Approval, CustomerDesc, CustomerId, LimitLevel, LimitPeriod, Limits, Money, RetailerDesc,
-        RetailerId, SetApproval, SetLimit, SetLimitGlobal, SetMinPurchase,
+        RetailerId, Routing, SetApproval, SetLimit, SetLimitGlobal, SetMinPurchase, SetRouting,
     },
     auth::Scope,
 };
@@ -676,6 +676,258 @@ pub async fn set_min_purchase_limit(
             Json(serde_json::json!({
                 "error": status.message(),
             })),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::get("/customer/{customer_id}/routing")]
+pub async fn get_customer_routing(user: User, path: web::Path<String>) -> impl Responder {
+    let User::Authenticated { customer_id, scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let in_customer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) && customer_id != Some(in_customer_id.clone()) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .get_customer_routing(CustomerId { id: in_customer_id })
+        .await
+    {
+        Ok(resp) => (Either::Left(Json(resp.into_inner())), StatusCode::OK),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::post("/customer/{customer_id}/routing")]
+pub async fn set_customer_routing(
+    user: User,
+    path: web::Path<String>,
+    routing: Json<Routing>,
+) -> impl Responder {
+    let User::Authenticated {  scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let customer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .set_customer_routing(SetRouting {
+            id: customer_id,
+            routing: Some(routing.0),
+        })
+        .await
+    {
+        Ok(_resp) => (
+            Either::Left(Json(serde_json::json!({
+                "success": [],
+            }))),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::get("/retailer/{retailer_id}/routing")]
+pub async fn get_retailer_routing(user: User, path: web::Path<String>) -> impl Responder {
+    let User::Authenticated { retailer_id, scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let in_retailer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) && retailer_id != Some(in_retailer_id.clone()) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .get_retailer_routing(RetailerId { id: in_retailer_id })
+        .await
+    {
+        Ok(resp) => (Either::Left(Json(resp.into_inner())), StatusCode::OK),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::post("/retailer/{retailer_id}/routing")]
+pub async fn set_retailer_routing(
+    user: User,
+    path: web::Path<String>,
+    routing: Json<Routing>,
+) -> impl Responder {
+    let User::Authenticated { scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let retailer_id = path.into_inner();
+    if !scopes.contains(&Scope::Admin) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client
+        .set_retailer_routing(SetRouting {
+            id: retailer_id,
+            routing: Some(routing.0),
+        })
+        .await
+    {
+        Ok(_resp) => (
+            Either::Left(Json(serde_json::json!({
+                "success": [],
+            }))),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::get("/global/routing")]
+pub async fn get_global_routing(user: User) -> impl Responder {
+    let User::Authenticated { .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client.get_global_routing(()).await {
+        Ok(resp) => (Either::Left(Json(resp.into_inner())), StatusCode::OK),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
+            tonic_code_to_status_code(status.code()),
+        ),
+    }
+}
+
+#[actix_web::post("/global/routing")]
+pub async fn set_global_routing(user: User, routing: Json<Routing>) -> impl Responder {
+    let User::Authenticated { scopes , .. } = user else {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You are not authenticated and can't access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    };
+
+    if !scopes.contains(&Scope::Admin) {
+        return (
+            Either::Right(Json(serde_json::json!({
+                "error": "You do not have permission to access this api."
+            }))),
+            StatusCode::UNAUTHORIZED,
+        );
+    }
+
+    let mut client = ACCOUNT_CLIENT
+        .get()
+        .expect("ACCOUNT_CLIENT used before it was initalized")
+        .clone();
+
+    match client.set_global_routing(routing.0).await {
+        Ok(_resp) => (
+            Either::Left(Json(serde_json::json!({
+                "success": [],
+            }))),
+            StatusCode::OK,
+        ),
+        Err(status) => (
+            Either::Right(Json(serde_json::json!({
+                "error": status.message(),
+            }))),
             tonic_code_to_status_code(status.code()),
         ),
     }

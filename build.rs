@@ -16,6 +16,16 @@ fn main() {
             "#[derive(serde::Serialize, serde::Deserialize)]",
         )
         .type_attribute("Money", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .type_attribute("Source", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .type_attribute(
+            "RoutingEntry",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute("Routing", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .type_attribute(
+            "SetRouting",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
         .compile(&["proto/account.proto"], &["proto"])
         .unwrap();
     tonic_build::configure()

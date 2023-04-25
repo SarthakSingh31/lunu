@@ -18,6 +18,10 @@ pub mod sql_types {
     pub struct LimitPeriod;
 
     #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "profile_index"))]
+    pub struct ProfileIndex;
+
+    #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "scope"))]
     pub struct Scope;
 }
@@ -32,6 +36,39 @@ diesel::table! {
 }
 
 diesel::table! {
+    custody_providers (id) {
+        id -> Uuid,
+        name -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    customer_custody_provider_routing (idx, customer_id) {
+        idx -> ProfileIndex,
+        customer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    customer_exchange_provider_routing (idx, customer_id) {
+        idx -> ProfileIndex,
+        customer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::LimitPeriod;
     use super::sql_types::LimitLevel;
@@ -42,6 +79,19 @@ diesel::table! {
         amount -> Numeric,
         currency -> Text,
         customer_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    customer_payment_gateway_routing (idx, customer_id) {
+        idx -> ProfileIndex,
+        customer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
     }
 }
 
@@ -75,6 +125,37 @@ diesel::table! {
 }
 
 diesel::table! {
+    exchange_providers (id) {
+        id -> Uuid,
+        name -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    global_custody_provider_routing (idx) {
+        idx -> ProfileIndex,
+        selected -> Nullable<Uuid>,
+        amount -> Nullable<Numeric>,
+        currency -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    global_exchange_provider_routing (idx) {
+        idx -> ProfileIndex,
+        selected -> Nullable<Uuid>,
+        amount -> Nullable<Numeric>,
+        currency -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::LimitPeriod;
     use super::sql_types::LimitLevel;
@@ -84,6 +165,18 @@ diesel::table! {
         level -> LimitLevel,
         amount -> Numeric,
         currency -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    global_payment_gateway_routing (idx) {
+        idx -> ProfileIndex,
+        selected -> Nullable<Uuid>,
+        amount -> Nullable<Numeric>,
+        currency -> Nullable<Text>,
     }
 }
 
@@ -105,6 +198,39 @@ diesel::table! {
 }
 
 diesel::table! {
+    payment_gateways (id) {
+        id -> Uuid,
+        name -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    retailer_custody_provider_routing (idx, retailer_id) {
+        idx -> ProfileIndex,
+        retailer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    retailer_exchange_provider_routing (idx, retailer_id) {
+        idx -> ProfileIndex,
+        retailer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::LimitPeriod;
     use super::sql_types::LimitLevel;
@@ -115,6 +241,19 @@ diesel::table! {
         amount -> Numeric,
         currency -> Text,
         retailer_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::ProfileIndex;
+
+    retailer_payment_gateway_routing (idx, retailer_id) {
+        idx -> ProfileIndex,
+        retailer_id -> Uuid,
+        selected -> Uuid,
+        amount -> Numeric,
+        currency -> Text,
     }
 }
 
@@ -178,12 +317,27 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(customer_custody_provider_routing -> custody_providers (selected));
+diesel::joinable!(customer_custody_provider_routing -> customers (customer_id));
+diesel::joinable!(customer_exchange_provider_routing -> customers (customer_id));
+diesel::joinable!(customer_exchange_provider_routing -> exchange_providers (selected));
 diesel::joinable!(customer_limits -> customers (customer_id));
+diesel::joinable!(customer_payment_gateway_routing -> customers (customer_id));
+diesel::joinable!(customer_payment_gateway_routing -> payment_gateways (selected));
 diesel::joinable!(customers -> accounts (account_id));
 diesel::joinable!(email_login_intents -> accounts (account_id));
+diesel::joinable!(global_custody_provider_routing -> custody_providers (selected));
+diesel::joinable!(global_exchange_provider_routing -> exchange_providers (selected));
+diesel::joinable!(global_payment_gateway_routing -> payment_gateways (selected));
 diesel::joinable!(new_pass_login_intents -> accounts (account_id));
 diesel::joinable!(password_login -> accounts (account_id));
+diesel::joinable!(retailer_custody_provider_routing -> custody_providers (selected));
+diesel::joinable!(retailer_custody_provider_routing -> retailers (retailer_id));
+diesel::joinable!(retailer_exchange_provider_routing -> exchange_providers (selected));
+diesel::joinable!(retailer_exchange_provider_routing -> retailers (retailer_id));
 diesel::joinable!(retailer_limits -> retailers (retailer_id));
+diesel::joinable!(retailer_payment_gateway_routing -> payment_gateways (selected));
+diesel::joinable!(retailer_payment_gateway_routing -> retailers (retailer_id));
 diesel::joinable!(retailers -> accounts (account_id));
 diesel::joinable!(scopes -> accounts (account_id));
 diesel::joinable!(sessions -> accounts (account_id));
@@ -191,13 +345,25 @@ diesel::joinable!(transactions -> retailers (retailer_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
+    custody_providers,
+    customer_custody_provider_routing,
+    customer_exchange_provider_routing,
     customer_limits,
+    customer_payment_gateway_routing,
     customers,
     email_login_intents,
+    exchange_providers,
+    global_custody_provider_routing,
+    global_exchange_provider_routing,
     global_limits,
+    global_payment_gateway_routing,
     new_pass_login_intents,
     password_login,
+    payment_gateways,
+    retailer_custody_provider_routing,
+    retailer_exchange_provider_routing,
     retailer_limits,
+    retailer_payment_gateway_routing,
     retailers,
     scopes,
     sessions,

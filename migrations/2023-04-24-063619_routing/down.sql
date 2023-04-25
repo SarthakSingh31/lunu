@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS customer_payment_gateway_routing;
+DROP TABLE IF EXISTS retailer_payment_gateway_routing;
+DROP TABLE IF EXISTS global_payment_gateway_routing;
+DROP TABLE IF EXISTS payment_gateways;
+DROP TABLE IF EXISTS customer_custody_provider_routing;
+DROP TABLE IF EXISTS retailer_custody_provider_routing;
+DROP TABLE IF EXISTS global_custody_provider_routing;
+DROP TABLE IF EXISTS custody_providers;
+DROP TABLE IF EXISTS customer_exchange_provider_routing;
+DROP TABLE IF EXISTS retailer_exchange_provider_routing;
+DROP TABLE IF EXISTS global_exchange_provider_routing;
+DROP TABLE IF EXISTS exchange_providers;
+DROP TYPE IF EXISTS PROFILE_INDEX;
