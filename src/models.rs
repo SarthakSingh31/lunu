@@ -214,7 +214,7 @@ impl TryFrom<usize> for ProfileIndex {
             0 => Ok(ProfileIndex::Zero),
             1 => Ok(ProfileIndex::One),
             2 => Ok(ProfileIndex::Two),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
@@ -279,6 +279,13 @@ pub struct Customer {
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = schema::retailers)]
 pub struct Retailer {
+    pub id: Uuid,
+    pub account_id: Uuid,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = schema::partners)]
+pub struct Partner {
     pub id: Uuid,
     pub account_id: Uuid,
 }

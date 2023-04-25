@@ -10,11 +10,18 @@ enum Approval {
   Rejected = 2;
 }
 
-enum LimitLevel {
+enum KycLevel {
   KycLevel0 = 0;
   KycLevel1 = 1;
   KycLevel2 = 2;
   KycLevel3 = 3;
+}
+
+enum LimitLevel {
+  LimitKycLevel0 = 0;
+  LimitKycLevel1 = 1;
+  LimitKycLevel2 = 2;
+  LimitKycLevel3 = 3;
   Overall = 4;
 }
 
@@ -42,13 +49,42 @@ message CustomerDesc {
   string last_name = 3;
 }
 
+message CustomerData {
+  string first_name = 1;
+  string last_name = 2;
+  optional string approved_at = 3;
+  optional Approval approved = 4;
+  KycLevel kyc_level = 5;
+  optional string residence_address = 6;
+  optional string country_of_residence = 7;
+}
+
 message RetailerDesc { string account_id = 1; }
 
-message CustomerId { string id = 1; }
+message RetailerData {
+  optional string addr_line_1 = 1;
+  optional string addr_line_2 = 2;
+  optional string country = 3;
+  optional string approved_at = 4;
+  optional Approval approved = 5;
+  repeated string partners = 6;
+}
 
-message RetailerId { string id = 1; }
+message PartnerDesc { string account_id = 1; }
 
-message GetApproval { Approval approval = 1; }
+message PartnerData {
+  optional string approved_at = 1;
+  optional Approval approved = 2;
+}
+
+message Id { string id = 1; }
+
+message RetailerPartner {
+  string retailer_id = 1;
+  string partner_id = 2;
+}
+
+message GetApproval { optional Approval approval = 1; }
 
 message SetApproval {
   string id = 1;
@@ -96,29 +132,105 @@ message SetRouting {
   Routing routing = 2;
 }
 
-service Account {
-  rpc CreateCustomer(CustomerDesc) returns (CustomerId) {}
-  rpc CreateRetailer(RetailerDesc) returns (RetailerId) {}
+message Fee {
+  // The digits of the number
+  bytes digits = 1;
 
-  rpc GetApprovalCustomer(CustomerId) returns (GetApproval) {}
+  // The exponent of the floating point number
+  int64 exponent = 2;
+}
+
+message PartnerRetailerFeeEntry {
+  string partner_id = 1;
+  Fee partner_fee = 2;
+  Money additional_fixed_fee = 3;
+}
+
+message PaymentMethod {
+  string id = 1;
+  string name = 2;
+}
+
+message RetailerFeeEntry {
+  PaymentMethod payment_method = 1;
+  Fee retailer_fee = 2;
+  Fee consumer_fee = 3;
+  Fee exchange_spread = 4;
+  Fee exchange_spread_stable_coins = 5;
+  Fee min_transaction_fee = 6;
+  repeated PartnerRetailerFeeEntry referral_partner_fees = 7;
+  Money additional_fixed_fee = 8;
+}
+
+message PutRetailerFeeEntry {
+  string payment_method_id = 1;
+  Fee retailer_fee = 2;
+  Fee consumer_fee = 3;
+  Fee exchange_spread = 4;
+  Fee exchange_spread_stable_coins = 5;
+  Fee min_transaction_fee = 6;
+  Money additional_fixed_fee = 7;
+}
+
+message RetailerFees { repeated RetailerFeeEntry fees = 1; }
+message PutRetailerFees {
+  string id = 1;
+  repeated PutRetailerFeeEntry fees = 2;
+}
+
+message PartnerFeeEntry {
+  PaymentMethod payment_method = 1;
+  Fee partner_fee = 2;
+  Money additional_fixed_fee = 3;
+}
+
+message PartnerFees { repeated PartnerFeeEntry fees = 1; }
+
+message PutPartnerFeeEntry {
+  string payment_method_id = 1;
+  Fee partner_fee = 2;
+  Money additional_fixed_fee = 3;
+}
+message PutPartnerFees {
+  string id = 1;
+  repeated PutPartnerFeeEntry fees = 2;
+}
+
+service Account {
+  rpc CreateCustomer(CustomerDesc) returns (Id) {}
+  rpc GetCustomer(Id) returns (CustomerData) {}
+  rpc CreateRetailer(RetailerDesc) returns (Id) {}
+  rpc GetRetailer(Id) returns (RetailerData) {}
+  rpc CreatePartner(PartnerDesc) returns (Id) {}
+  rpc GetPartner(Id) returns (PartnerData) {}
+
+  rpc AddRetailerPartner(RetailerPartner) returns (google.protobuf.Empty) {}
+  rpc RemoveRetailerPartner(RetailerPartner) returns (google.protobuf.Empty) {}
+
+  rpc GetApprovalCustomer(Id) returns (GetApproval) {}
   rpc SetApprovalCustomer(SetApproval) returns (google.protobuf.Empty) {}
-  rpc GetApprovalRetailer(RetailerId) returns (GetApproval) {}
+  rpc GetApprovalRetailer(Id) returns (GetApproval) {}
   rpc SetApprovalRetailer(SetApproval) returns (google.protobuf.Empty) {}
 
-  rpc GetCustomerLimits(CustomerId) returns (InnerLimits) {}
+  rpc GetCustomerLimits(Id) returns (InnerLimits) {}
   rpc SetCustomerLimit(SetLimit) returns (google.protobuf.Empty) {}
-  rpc GetRetailerLimits(RetailerId) returns (InnerLimits) {}
+  rpc GetRetailerLimits(Id) returns (InnerLimits) {}
   rpc SetRetailerLimit(SetLimit) returns (google.protobuf.Empty) {}
   rpc GetGlobalLimits(google.protobuf.Empty) returns (InnerLimits) {}
   rpc SetGlobalLimit(SetLimitGlobal) returns (google.protobuf.Empty) {}
 
-  rpc GetMinPurchaseValue(CustomerId) returns (Money) {}
+  rpc GetMinPurchaseValue(Id) returns (Money) {}
   rpc SetMinPurchaseValue(SetMinPurchase) returns (google.protobuf.Empty) {}
 
-  rpc GetCustomerRouting(CustomerId) returns (Routing) {}
+  rpc GetCustomerRouting(Id) returns (Routing) {}
   rpc SetCustomerRouting(SetRouting) returns (google.protobuf.Empty) {}
-  rpc GetRetailerRouting(RetailerId) returns (Routing) {}
+  rpc GetRetailerRouting(Id) returns (Routing) {}
   rpc SetRetailerRouting(SetRouting) returns (google.protobuf.Empty) {}
   rpc GetGlobalRouting(google.protobuf.Empty) returns (Routing) {}
   rpc SetGlobalRouting(Routing) returns (google.protobuf.Empty) {}
+
+  rpc GetRetailerFees(Id) returns (RetailerFees) {}
+  rpc SetRetailerFees(PutRetailerFees) returns (google.protobuf.Empty) {}
+  rpc GetPartnerFees(Id) returns (PartnerFees) {}
+  rpc SetPartnerFees(PutPartnerFees) returns (google.protobuf.Empty) {}
 }

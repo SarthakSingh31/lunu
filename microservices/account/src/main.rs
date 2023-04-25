@@ -6,11 +6,12 @@ use bigdecimal::{num_bigint::BigInt, BigDecimal};
 use helpers::routing::RoutingTable;
 use lunu::{
     account::{
-        account_server::AccountServer, Approval, CustomerDesc, CustomerId, GetApproval,
-        InnerLimits, Limits, Money, RetailerDesc, RetailerId, Routing, SetApproval, SetLimit,
-        SetLimitGlobal, SetMinPurchase, SetRouting,
+        account_server::AccountServer, Approval, CustomerData, CustomerDesc, GetApproval, Id,
+        InnerLimits, KycLevel, Limits, Money, PartnerData, PartnerDesc, PartnerFees,
+        PutPartnerFees, PutRetailerFees, RetailerData, RetailerDesc, RetailerFees, RetailerPartner,
+        Routing, SetApproval, SetLimit, SetLimitGlobal, SetMinPurchase, SetRouting,
     },
-    diesel::{insert_into, update, ExpressionMethods, QueryDsl},
+    diesel::{delete, insert_into, update, BoolExpressionMethods, ExpressionMethods, QueryDsl},
     diesel_async::{
         pooled_connection::{bb8::Pool, AsyncDieselConnectionManager},
         AsyncPgConnection, RunQueryDsl,
@@ -31,7 +32,7 @@ impl lunu::account::account_server::Account for Account {
     async fn create_customer(
         &self,
         request: tonic::Request<CustomerDesc>,
-    ) -> Result<tonic::Response<CustomerId>, tonic::Status> {
+    ) -> Result<tonic::Response<Id>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
@@ -60,13 +61,62 @@ impl lunu::account::account_server::Account for Account {
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(CustomerId { id: id.to_string() }))
+        Ok(tonic::Response::new(Id { id: id.to_string() }))
+    }
+
+    async fn get_customer(
+        &self,
+        request: tonic::Request<Id>,
+    ) -> Result<tonic::Response<CustomerData>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let Id { id } = request.into_inner();
+        let customer_id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::customers::dsl as c_dsl;
+
+        let data = c_dsl::customers
+            .filter(c_dsl::id.eq(customer_id))
+            .select((
+                c_dsl::first_name,
+                c_dsl::last_name,
+                c_dsl::kyc_level,
+                c_dsl::approved_at,
+                c_dsl::approved,
+                c_dsl::residence_address,
+                c_dsl::country_of_residence,
+            ))
+            .first::<(
+                String,
+                String,
+                models::KycLevel,
+                Option<OffsetDateTime>,
+                Option<models::Approval>,
+                Option<String>,
+                Option<String>,
+            )>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(CustomerData {
+            first_name: data.0,
+            last_name: data.1,
+            kyc_level: KycLevel::from(data.2) as i32,
+            approved_at: data.3.map(|time| time.to_string()),
+            approved: data.4.map(|approval| Approval::from(approval) as i32),
+            residence_address: data.5,
+            country_of_residence: data.6,
+        }))
     }
 
     async fn create_retailer(
         &self,
         request: tonic::Request<RetailerDesc>,
-    ) -> Result<tonic::Response<RetailerId>, tonic::Status> {
+    ) -> Result<tonic::Response<Id>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
@@ -86,12 +136,191 @@ impl lunu::account::account_server::Account for Account {
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
 
-        Ok(tonic::Response::new(RetailerId { id: id.to_string() }))
+        Ok(tonic::Response::new(Id { id: id.to_string() }))
+    }
+
+    async fn get_retailer(
+        &self,
+        request: tonic::Request<Id>,
+    ) -> Result<tonic::Response<RetailerData>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let Id { id } = request.into_inner();
+        let retailer_id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::retailers::dsl as r_dsl;
+
+        let data = r_dsl::retailers
+            .filter(r_dsl::id.eq(retailer_id))
+            .select((
+                r_dsl::addr_line_1,
+                r_dsl::addr_line_2,
+                r_dsl::country,
+                r_dsl::approved_at,
+                r_dsl::approved,
+            ))
+            .first::<(
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                Option<OffsetDateTime>,
+                Option<models::Approval>,
+            )>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        use schema::retailer_partners::dsl as rp_dsl;
+
+        let partners = rp_dsl::retailer_partners
+            .filter(rp_dsl::retailer_id.eq(retailer_id))
+            .select(rp_dsl::partner_id)
+            .load::<Uuid>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(RetailerData {
+            addr_line_1: data.0,
+            addr_line_2: data.1,
+            country: data.2,
+            approved_at: data.3.map(|time| time.to_string()),
+            approved: data.4.map(|approval| Approval::from(approval) as i32),
+            partners: partners
+                .into_iter()
+                .map(|partner| partner.to_string())
+                .collect(),
+        }))
+    }
+
+    async fn create_partner(
+        &self,
+        request: tonic::Request<PartnerDesc>,
+    ) -> Result<tonic::Response<Id>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let PartnerDesc { account_id } = request.into_inner();
+        let account_id =
+            Uuid::from_str(&account_id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::partners::dsl as p_dsl;
+
+        let id = Uuid::new_v4();
+        insert_into(p_dsl::partners)
+            .values(models::Partner { id, account_id })
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(Id { id: id.to_string() }))
+    }
+
+    async fn get_partner(
+        &self,
+        request: tonic::Request<Id>,
+    ) -> Result<tonic::Response<PartnerData>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let Id { id } = request.into_inner();
+        let partner_id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::partners::dsl as p_dsl;
+
+        let data = p_dsl::partners
+            .filter(p_dsl::id.eq(partner_id))
+            .select((p_dsl::approved_at, p_dsl::approved))
+            .first::<(Option<OffsetDateTime>, Option<models::Approval>)>(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(PartnerData {
+            approved_at: data.0.map(|time| time.to_string()),
+            approved: data.1.map(|approval| Approval::from(approval) as i32),
+        }))
+    }
+
+    async fn add_retailer_partner(
+        &self,
+        request: tonic::Request<RetailerPartner>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let RetailerPartner {
+            retailer_id,
+            partner_id,
+        } = request.into_inner();
+
+        let retailer_id =
+            Uuid::from_str(&retailer_id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let partner_id =
+            Uuid::from_str(&partner_id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::retailer_partners::dsl as rp_dsl;
+
+        insert_into(rp_dsl::retailer_partners)
+            .values((
+                rp_dsl::retailer_id.eq(retailer_id),
+                rp_dsl::partner_id.eq(partner_id),
+            ))
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn remove_retailer_partner(
+        &self,
+        request: tonic::Request<RetailerPartner>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let conn = &mut self
+            .pool
+            .get()
+            .await
+            .map_err(|_| AccountError::PoolConnectionFailed)?;
+
+        let RetailerPartner {
+            retailer_id,
+            partner_id,
+        } = request.into_inner();
+
+        let retailer_id =
+            Uuid::from_str(&retailer_id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let partner_id =
+            Uuid::from_str(&partner_id).map_err(|_| AccountError::MalformedAccountToken)?;
+
+        use schema::retailer_partners::dsl as rp_dsl;
+
+        delete(rp_dsl::retailer_partners)
+            .filter(
+                rp_dsl::retailer_id
+                    .eq(retailer_id)
+                    .and(rp_dsl::partner_id.eq(partner_id)),
+            )
+            .execute(conn)
+            .await
+            .map_err(|e| AccountError::QueryFailed(e.to_string()))?;
+
+        Ok(tonic::Response::new(()))
     }
 
     async fn get_approval_customer(
         &self,
-        request: tonic::Request<CustomerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<GetApproval>, tonic::Status> {
         let conn = &mut self
             .pool
@@ -103,18 +332,17 @@ impl lunu::account::account_server::Account for Account {
 
         use schema::customers::dsl as c_dsl;
 
-        let approval: Approval = c_dsl::customers
+        let approval = c_dsl::customers
             .filter(c_dsl::id.eq(id))
             .select(c_dsl::approved)
-            .load::<models::Approval>(conn)
+            .load::<Option<models::Approval>>(conn)
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?
             .pop()
-            .ok_or(AccountError::CustomerNotFound)?
-            .into();
+            .ok_or(AccountError::CustomerNotFound)?;
 
         Ok(tonic::Response::new(GetApproval {
-            approval: approval as i32,
+            approval: approval.map(|approval| Approval::from(approval) as i32),
         }))
     }
 
@@ -154,7 +382,7 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_approval_retailer(
         &self,
-        request: tonic::Request<RetailerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<GetApproval>, tonic::Status> {
         let conn = &mut self
             .pool
@@ -166,18 +394,17 @@ impl lunu::account::account_server::Account for Account {
 
         use schema::retailers::dsl as r_dsl;
 
-        let approval: Approval = r_dsl::retailers
+        let approval = r_dsl::retailers
             .filter(r_dsl::id.eq(id))
             .select(r_dsl::approved)
-            .load::<models::Approval>(conn)
+            .load::<Option<models::Approval>>(conn)
             .await
             .map_err(|e| AccountError::QueryFailed(e.to_string()))?
             .pop()
-            .ok_or(AccountError::RetailerNotFound)?
-            .into();
+            .ok_or(AccountError::RetailerNotFound)?;
 
         Ok(tonic::Response::new(GetApproval {
-            approval: approval as i32,
+            approval: approval.map(|approval| Approval::from(approval) as i32),
         }))
     }
 
@@ -217,14 +444,14 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_customer_limits(
         &self,
-        request: tonic::Request<CustomerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<InnerLimits>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
             .await
             .map_err(|_| AccountError::PoolConnectionFailed)?;
-        let CustomerId { id } = request.into_inner();
+        let Id { id } = request.into_inner();
         let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
 
         use schema::customer_limits::dsl as cl_dsl;
@@ -307,14 +534,14 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_retailer_limits(
         &self,
-        request: tonic::Request<RetailerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<InnerLimits>, tonic::Status> {
         let conn = &mut self
             .pool
             .get()
             .await
             .map_err(|_| AccountError::PoolConnectionFailed)?;
-        let RetailerId { id } = request.into_inner();
+        let Id { id } = request.into_inner();
         let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
 
         use schema::retailer_limits::dsl as rl_dsl;
@@ -466,7 +693,7 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_min_purchase_value(
         &self,
-        request: tonic::Request<CustomerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<Money>, tonic::Status> {
         let conn = &mut self
             .pool
@@ -525,9 +752,9 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_customer_routing(
         &self,
-        request: tonic::Request<CustomerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<Routing>, tonic::Status> {
-        let CustomerId { id } = request.into_inner();
+        let Id { id } = request.into_inner();
         let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
 
         Ok(tonic::Response::new(
@@ -552,9 +779,9 @@ impl lunu::account::account_server::Account for Account {
 
     async fn get_retailer_routing(
         &self,
-        request: tonic::Request<RetailerId>,
+        request: tonic::Request<Id>,
     ) -> Result<tonic::Response<Routing>, tonic::Status> {
-        let RetailerId { id } = request.into_inner();
+        let Id { id } = request.into_inner();
         let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
 
         Ok(tonic::Response::new(
@@ -596,11 +823,66 @@ impl lunu::account::account_server::Account for Account {
             helpers::routing::GlobalRouting::set(&self.pool, (), routing).await?,
         ))
     }
+
+    async fn get_retailer_fees(
+        &self,
+        request: tonic::Request<Id>,
+    ) -> Result<tonic::Response<RetailerFees>, tonic::Status> {
+        let id = Uuid::from_str(&request.into_inner().id)
+            .map_err(|_| AccountError::MalformedAccountToken)?;
+        let fees = helpers::fees::RetailerFees(&self.pool);
+
+        Ok(tonic::Response::new(fees.get(id).await?))
+    }
+
+    async fn set_retailer_fees(
+        &self,
+        request: tonic::Request<PutRetailerFees>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let PutRetailerFees {
+            id,
+            fees: retailer_fees,
+        } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let fees = helpers::fees::RetailerFees(&self.pool);
+
+        fees.set(id, retailer_fees).await?;
+
+        Ok(tonic::Response::new(()))
+    }
+
+    async fn get_partner_fees(
+        &self,
+        request: tonic::Request<Id>,
+    ) -> Result<tonic::Response<PartnerFees>, tonic::Status> {
+        let id = Uuid::from_str(&request.into_inner().id)
+            .map_err(|_| AccountError::MalformedAccountToken)?;
+        let fees = helpers::fees::PartnerFees(&self.pool);
+
+        Ok(tonic::Response::new(fees.get(id).await?))
+    }
+
+    async fn set_partner_fees(
+        &self,
+        request: tonic::Request<PutPartnerFees>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let PutPartnerFees {
+            id,
+            fees: partner_fees,
+        } = request.into_inner();
+        let id = Uuid::from_str(&id).map_err(|_| AccountError::MalformedAccountToken)?;
+        let fees = helpers::fees::PartnerFees(&self.pool);
+
+        fees.set(id, partner_fees).await?;
+
+        Ok(tonic::Response::new(()))
+    }
 }
 
 enum AccountError {
     MalformedAccountToken,
     MalformedRoutingSourceToken,
+    MalformedPaymentId,
     QueryFailed(String),
     PoolConnectionFailed,
     MissingAmount,
@@ -618,6 +900,9 @@ impl From<AccountError> for tonic::Status {
             }
             AccountError::MalformedRoutingSourceToken => {
                 tonic::Status::invalid_argument("Malformed routing source token")
+            }
+            AccountError::MalformedPaymentId => {
+                tonic::Status::invalid_argument("Malformed payment id")
             }
             AccountError::QueryFailed(s) => tonic::Status::internal(format!("Query Failed: {s}")),
             AccountError::PoolConnectionFailed => {

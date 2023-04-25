@@ -12,6 +12,7 @@ pub enum User {
         account_id: String,
         customer_id: Option<String>,
         retailer_id: Option<String>,
+        partner_id: Option<String>,
         scopes: HashSet<Scope>,
         password_login: bool,
     },
@@ -81,6 +82,7 @@ impl FromRequest for User {
                         account_id: acc.id,
                         customer_id: acc.customer_id,
                         retailer_id: acc.retailer_id,
+                        partner_id: acc.partner_id,
                         password_login: account.password_login,
                     })
                 } else {

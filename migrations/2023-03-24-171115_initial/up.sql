@@ -84,7 +84,7 @@ CREATE TABLE retailers(
     country TEXT,
 
     approved_at TIMESTAMP WITH TIME ZONE,
-    approved APPROVAL NOT NULL DEFAULT 'OnHold',
+    approved APPROVAL,
 
     account_id UUID UNIQUE,
     FOREIGN KEY (account_id)
@@ -102,7 +102,7 @@ CREATE TABLE customers(
     kyc_level KYC_LEVEL NOT NULL DEFAULT 'Level0',
 
     approved_at TIMESTAMP WITH TIME ZONE,
-    approved APPROVAL NOT NULL DEFAULT 'OnHold',
+    approved APPROVAL,
 
     residence_address TEXT,
     country_of_residence TEXT,

@@ -106,7 +106,7 @@ diesel::table! {
         last_name -> Text,
         kyc_level -> KycLevel,
         approved_at -> Nullable<Timestamptz>,
-        approved -> Approval,
+        approved -> Nullable<Approval>,
         residence_address -> Nullable<Text>,
         country_of_residence -> Nullable<Text>,
         account_id -> Nullable<Uuid>,
@@ -189,6 +189,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    partner_fees (payment_method_id, partner_id) {
+        payment_method_id -> Uuid,
+        partner_id -> Uuid,
+        referral_partner_fee -> Numeric,
+        additional_fixed_fee_amount -> Numeric,
+        additional_fixed_fee_currency -> Text,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::Approval;
+
+    partners (id) {
+        id -> Uuid,
+        approved_at -> Nullable<Timestamptz>,
+        approved -> Nullable<Approval>,
+        account_id -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
     password_login (account_id) {
         account_id -> Uuid,
         hash -> Text,
@@ -199,6 +221,13 @@ diesel::table! {
 
 diesel::table! {
     payment_gateways (id) {
+        id -> Uuid,
+        name -> Text,
+    }
+}
+
+diesel::table! {
+    payment_methods (id) {
         id -> Uuid,
         name -> Text,
     }
@@ -231,6 +260,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    retailer_fees (payment_method_id, retailer_id) {
+        payment_method_id -> Uuid,
+        retailer_id -> Uuid,
+        retailer_fee -> Numeric,
+        consumer_fee -> Numeric,
+        exchange_spread -> Numeric,
+        exchange_spread_stable_coin -> Numeric,
+        min_transaction_fee -> Numeric,
+        base_additional_fixed_fee_amount -> Numeric,
+        base_additional_fixed_fee_currency -> Text,
+    }
+}
+
+diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::LimitPeriod;
     use super::sql_types::LimitLevel;
@@ -241,6 +284,13 @@ diesel::table! {
         amount -> Numeric,
         currency -> Text,
         retailer_id -> Uuid,
+    }
+}
+
+diesel::table! {
+    retailer_partners (retailer_id, partner_id) {
+        retailer_id -> Uuid,
+        partner_id -> Uuid,
     }
 }
 
@@ -267,7 +317,7 @@ diesel::table! {
         addr_line_2 -> Nullable<Text>,
         country -> Nullable<Text>,
         approved_at -> Nullable<Timestamptz>,
-        approved -> Approval,
+        approved -> Nullable<Approval>,
         account_id -> Nullable<Uuid>,
     }
 }
@@ -330,12 +380,19 @@ diesel::joinable!(global_custody_provider_routing -> custody_providers (selected
 diesel::joinable!(global_exchange_provider_routing -> exchange_providers (selected));
 diesel::joinable!(global_payment_gateway_routing -> payment_gateways (selected));
 diesel::joinable!(new_pass_login_intents -> accounts (account_id));
+diesel::joinable!(partner_fees -> partners (partner_id));
+diesel::joinable!(partner_fees -> payment_methods (payment_method_id));
+diesel::joinable!(partners -> accounts (account_id));
 diesel::joinable!(password_login -> accounts (account_id));
 diesel::joinable!(retailer_custody_provider_routing -> custody_providers (selected));
 diesel::joinable!(retailer_custody_provider_routing -> retailers (retailer_id));
 diesel::joinable!(retailer_exchange_provider_routing -> exchange_providers (selected));
 diesel::joinable!(retailer_exchange_provider_routing -> retailers (retailer_id));
+diesel::joinable!(retailer_fees -> payment_methods (payment_method_id));
+diesel::joinable!(retailer_fees -> retailers (retailer_id));
 diesel::joinable!(retailer_limits -> retailers (retailer_id));
+diesel::joinable!(retailer_partners -> partners (partner_id));
+diesel::joinable!(retailer_partners -> retailers (retailer_id));
 diesel::joinable!(retailer_payment_gateway_routing -> payment_gateways (selected));
 diesel::joinable!(retailer_payment_gateway_routing -> retailers (retailer_id));
 diesel::joinable!(retailers -> accounts (account_id));
@@ -358,11 +415,16 @@ diesel::allow_tables_to_appear_in_same_query!(
     global_limits,
     global_payment_gateway_routing,
     new_pass_login_intents,
+    partner_fees,
+    partners,
     password_login,
     payment_gateways,
+    payment_methods,
     retailer_custody_provider_routing,
     retailer_exchange_provider_routing,
+    retailer_fees,
     retailer_limits,
+    retailer_partners,
     retailer_payment_gateway_routing,
     retailers,
     scopes,

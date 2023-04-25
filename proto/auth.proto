@@ -17,6 +17,7 @@ message Account {
   repeated Scope scopes = 2;
   optional string customer_id = 3;
   optional string retailer_id = 4;
+  optional string partner_id = 5;
 }
 
 message OptionalAccount {

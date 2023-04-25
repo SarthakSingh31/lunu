@@ -97,11 +97,37 @@ pub mod account {
     impl From<LimitLevel> for super::models::LimitLevel {
         fn from(val: LimitLevel) -> super::models::LimitLevel {
             match val {
-                LimitLevel::KycLevel0 => super::models::LimitLevel::KycLevel0,
-                LimitLevel::KycLevel1 => super::models::LimitLevel::KycLevel1,
-                LimitLevel::KycLevel2 => super::models::LimitLevel::KycLevel2,
-                LimitLevel::KycLevel3 => super::models::LimitLevel::KycLevel3,
+                LimitLevel::LimitKycLevel0 => super::models::LimitLevel::KycLevel0,
+                LimitLevel::LimitKycLevel1 => super::models::LimitLevel::KycLevel1,
+                LimitLevel::LimitKycLevel2 => super::models::LimitLevel::KycLevel2,
+                LimitLevel::LimitKycLevel3 => super::models::LimitLevel::KycLevel3,
                 LimitLevel::Overall => super::models::LimitLevel::Overall,
+            }
+        }
+    }
+
+    #[cfg(feature = "db")]
+    impl From<super::models::LimitLevel> for LimitLevel {
+        fn from(val: super::models::LimitLevel) -> LimitLevel {
+            match val {
+                super::models::LimitLevel::KycLevel0 => LimitLevel::LimitKycLevel0,
+                super::models::LimitLevel::KycLevel1 => LimitLevel::LimitKycLevel1,
+                super::models::LimitLevel::KycLevel2 => LimitLevel::LimitKycLevel2,
+                super::models::LimitLevel::KycLevel3 => LimitLevel::LimitKycLevel3,
+                super::models::LimitLevel::Overall => LimitLevel::Overall,
+            }
+        }
+    }
+
+    impl From<u8> for LimitLevel {
+        fn from(value: u8) -> Self {
+            match value {
+                x if x == LimitLevel::LimitKycLevel0 as u8 => LimitLevel::LimitKycLevel0,
+                x if x == LimitLevel::LimitKycLevel1 as u8 => LimitLevel::LimitKycLevel1,
+                x if x == LimitLevel::LimitKycLevel2 as u8 => LimitLevel::LimitKycLevel2,
+                x if x == LimitLevel::LimitKycLevel3 as u8 => LimitLevel::LimitKycLevel3,
+                x if x == LimitLevel::Overall as u8 => LimitLevel::Overall,
+                _ => panic!("LimitLevel got an invalid value in converting to limits"),
             }
         }
     }
@@ -113,19 +139,6 @@ pub mod account {
                 LimitPeriod::Daily => super::models::LimitPeriod::Daily,
                 LimitPeriod::Weekly => super::models::LimitPeriod::Weekly,
                 LimitPeriod::Monthly => super::models::LimitPeriod::Monthly,
-            }
-        }
-    }
-
-    #[cfg(feature = "db")]
-    impl From<super::models::LimitLevel> for LimitLevel {
-        fn from(val: super::models::LimitLevel) -> LimitLevel {
-            match val {
-                super::models::LimitLevel::KycLevel0 => LimitLevel::KycLevel0,
-                super::models::LimitLevel::KycLevel1 => LimitLevel::KycLevel1,
-                super::models::LimitLevel::KycLevel2 => LimitLevel::KycLevel2,
-                super::models::LimitLevel::KycLevel3 => LimitLevel::KycLevel3,
-                super::models::LimitLevel::Overall => LimitLevel::Overall,
             }
         }
     }
@@ -152,15 +165,14 @@ pub mod account {
         }
     }
 
-    impl From<u8> for LimitLevel {
-        fn from(value: u8) -> Self {
+    #[cfg(feature = "db")]
+    impl From<super::models::KycLevel> for KycLevel {
+        fn from(value: super::models::KycLevel) -> Self {
             match value {
-                x if x == LimitLevel::KycLevel0 as u8 => LimitLevel::KycLevel0,
-                x if x == LimitLevel::KycLevel1 as u8 => LimitLevel::KycLevel1,
-                x if x == LimitLevel::KycLevel2 as u8 => LimitLevel::KycLevel2,
-                x if x == LimitLevel::KycLevel3 as u8 => LimitLevel::KycLevel3,
-                x if x == LimitLevel::Overall as u8 => LimitLevel::Overall,
-                _ => panic!("LimitLevel got an invalid value in converting to limits"),
+                super::models::KycLevel::Level0 => KycLevel::KycLevel0,
+                super::models::KycLevel::Level1 => KycLevel::KycLevel1,
+                super::models::KycLevel::Level2 => KycLevel::KycLevel2,
+                super::models::KycLevel::Level3 => KycLevel::KycLevel3,
             }
         }
     }
@@ -226,24 +238,21 @@ pub mod account {
         }
     }
 
-    // pub enum FromRoutingError {
-    //     MalformedUuid,
-    //     MissingAmount,
-    // }
+    impl From<BigDecimal> for Fee {
+        fn from(amount: BigDecimal) -> Self {
+            let (digits, exponent) = amount.into_bigint_and_exponent();
+            Fee {
+                digits: digits.to_signed_bytes_le(),
+                exponent,
+            }
+        }
+    }
 
-    // impl TryInto<((Uuid, String), (String, BigDecimal))> for RoutingEntry {
-    //     type Error = FromRoutingError;
-
-    //     fn try_into(self) -> Result<((Uuid, String), (String, BigDecimal)), Self::Error> {
-    //         Ok((
-    //             (
-    //                 Uuid::from_str(&self.id).map_err(|_| FromRoutingError::MalformedUuid)?,
-    //                 self.name,
-    //             ),
-    //             self.amount.ok_or(FromRoutingError::MissingAmount)?.into(),
-    //         ))
-    //     }
-    // }
+    impl Into<BigDecimal> for Fee {
+        fn into(self) -> BigDecimal {
+            BigDecimal::new(BigInt::from_signed_bytes_le(&self.digits), self.exponent)
+        }
+    }
 }
 
 #[cfg(feature = "storage")]

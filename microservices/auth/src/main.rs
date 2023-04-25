@@ -215,11 +215,22 @@ impl lunu::auth::auth_server::Auth for Auth {
                 .map_err(|e| AuthError::QueryFailed(e.to_string()))?
                 .pop();
 
+            use schema::partners::dsl as p_dsl;
+
+            let partner_id = p_dsl::partners
+                .select(p_dsl::id)
+                .filter(p_dsl::account_id.eq(id))
+                .load::<Uuid>(conn)
+                .await
+                .map_err(|e| AuthError::QueryFailed(e.to_string()))?
+                .pop();
+
             Ok(tonic::Response::new(OptionalAccount {
                 account: Some(Account {
                     id: id.to_string(),
                     customer_id: customer_id.map(|id| id.to_string()),
                     retailer_id: retailer_id.map(|id| id.to_string()),
+                    partner_id: partner_id.map(|id| id.to_string()),
                     scopes,
                 }),
                 password_login,

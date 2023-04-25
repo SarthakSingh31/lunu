@@ -56,9 +56,16 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("/api/v1/account")
-                    // Create
+                    // Create & Get
                     .service(account::create_customer)
+                    .service(account::get_customer)
                     .service(account::create_retailer)
+                    .service(account::get_retailer)
+                    .service(account::create_partner)
+                    .service(account::get_partner)
+                    // Retailer Partner
+                    .service(account::add_retailer_partner)
+                    .service(account::remove_retailer_partner)
                     // Approval
                     .service(account::get_approval_customer)
                     .service(account::set_approval_customer)
@@ -80,7 +87,12 @@ async fn main() -> std::io::Result<()> {
                     .service(account::get_retailer_routing)
                     .service(account::set_retailer_routing)
                     .service(account::get_global_routing)
-                    .service(account::set_global_routing),
+                    .service(account::set_global_routing)
+                    // Fees
+                    .service(account::get_retailer_fees)
+                    .service(account::set_retailer_fees)
+                    .service(account::get_partner_fees)
+                    .service(account::set_partner_fees),
             )
     })
     .bind(("127.0.0.1", 8080))?
